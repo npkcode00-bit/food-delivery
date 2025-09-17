@@ -1,3 +1,4 @@
+"use client"
 import {CartContext} from "../AppContext";
 import MenuItemTile from "./MenuItemTile";
 import Image from "next/image";
