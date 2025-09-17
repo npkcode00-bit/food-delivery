@@ -1,4 +1,4 @@
-import FlyingButton from '../flyingButton'
+import FlyingButton from '../CustomFlyingButton'
 
 export default function AddToCartButton({
   hasSizesOrExtras, onClick, basePrice, image
