@@ -1,40 +1,68 @@
-import {isAdmin} from "@/app/api/auth/[...nextauth]/route";
-import {MenuItem} from "../../models/MenuItem";
-import mongoose from "mongoose";
+import mongoose from 'mongoose'
+import { NextResponse } from 'next/server'
+import { MenuItem } from '../../models/MenuItem'
+import { isAdmin } from '../../api/auth/[...nextauth]/auth'
 
-export async function POST(req) {
-  mongoose.connect(process.env.MONGO_URL);
-  const data = await req.json();
-  if (await isAdmin()) {
-    const menuItemDoc = await MenuItem.create(data);
-    return Response.json(menuItemDoc);
-  } else {
-    return Response.json({});
-  }
-}
+// NextAuth relies on Node APIs; avoid Edge.
+export const runtime = 'nodejs'
 
-export async function PUT(req) {
-  mongoose.connect(process.env.MONGO_URL);
-  if (await isAdmin()) {
-    const {_id, ...data} = await req.json();
-    await MenuItem.findByIdAndUpdate(_id, data);
-  }
-  return Response.json(true);
+// simple connector so we don't reconnect every request
+async function dbConnect() {
+  if (mongoose.connection.readyState === 1) return
+  await mongoose.connect(process.env.MONGO_URL)
 }
 
 export async function GET() {
-  mongoose.connect(process.env.MONGO_URL);
-  return Response.json(
-    await MenuItem.find()
-  );
+  await dbConnect()
+  const items = await MenuItem.find()
+  return NextResponse.json(items, { status: 200 })
+}
+
+export async function POST(req) {
+  await dbConnect()
+  if (!(await isAdmin())) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const data = await req.json()
+  // Basic validation
+  if (!data || typeof data !== 'object' || !data.name) {
+    return NextResponse.json({ error: 'Invalid payload' }, { status: 400 })
+  }
+
+  const doc = await MenuItem.create(data)
+  return NextResponse.json(doc, { status: 201 })
+}
+
+export async function PUT(req) {
+  await dbConnect()
+  if (!(await isAdmin())) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const body = await req.json()
+  const { _id, ...data } = body || {}
+
+  if (!_id) {
+    return NextResponse.json({ error: 'Missing _id' }, { status: 400 })
+  }
+
+  await MenuItem.findByIdAndUpdate(_id, data)
+  return NextResponse.json({ ok: true }, { status: 200 })
 }
 
 export async function DELETE(req) {
-  mongoose.connect(process.env.MONGO_URL);
-  const url = new URL(req.url);
-  const _id = url.searchParams.get('_id');
-  if (await isAdmin()) {
-    await MenuItem.deleteOne({_id});
+  await dbConnect()
+  if (!(await isAdmin())) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
-  return Response.json(true);
+
+  const url = new URL(req.url)
+  const _id = url.searchParams.get('_id')
+  if (!_id) {
+    return NextResponse.json({ error: 'Missing _id' }, { status: 400 })
+  }
+
+  await MenuItem.deleteOne({ _id })
+  return NextResponse.json({ ok: true }, { status: 200 })
 }
