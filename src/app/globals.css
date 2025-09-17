@@ -1,26 +1,55 @@
+/* src/app/globals.css (or wherever you import global CSS) */
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* Define your design tokens */
+@theme {
+  --color-primary: #f13a01;        /* text-primary / bg-primary */
+  --color-primary-light: #ff5c33;  /* text-primary-light */
+  --color-primary-dark: #b22a00;   /* text-primary-dark */
+
+  --color-secondary: #ffd700;      /* text-secondary / bg-secondary */
+  --color-secondary-dark: #e6c200;
+  --color-secondary-light: #ffea66;
+
+  --color-accent: #2563eb;
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+
+section.hero {
+  @apply grid;
+  grid-template-columns: .4fr .6fr;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+input[type=email],input[type=text],input[type=password] {
+ @apply block w-full my-2 rounded-xl;
+ @apply block border p-2 border-gray-300 bg-gray-100;
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+input[type=email]:disabled,
+input[type=text]:disabled,
+input[type=password]:disabled {
+ @apply bg-gray-100 text-gray-400;
+}
+
+
+button {
+ @apply block w-full text-gray-700 font-semibold;
+ @apply border border-gray-300 rounded-xl px-6 py-2; 
+}
+
+button[type=submit], .submit {
+  @apply border-primary bg-primary text-white;
+}
+
+
+button[type=submit]:disabled, .submit:disabled {
+  @apply cursor-not-allowed border-0 bg-gray-300 text-gray-100;
+}
+
+div.tabs > * {
+  @apply bg-gray-300  text-gray-700 rounded-full py-2 px-4
+}
+
+div.tabs > *.active {
+  @apply bg-primary text-white
 }
