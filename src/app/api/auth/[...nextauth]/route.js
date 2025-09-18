@@ -1,16 +1,22 @@
+// src/app/api/auth/[...nextauth]/route.js
 import mongoose from 'mongoose';
 import NextAuth from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import bcrypt from 'bcrypt';
 import { User } from '../../../models/User';
 
+// (optional but recommended for bcrypt)
+export const runtime = 'nodejs';
+
 async function dbConnect() {
-  if (mongoose.connection.readyState === 1) return;
+  if (mongoose.connection.readyState >= 1) return;
   await mongoose.connect(process.env.MONGO_URL);
 }
 
-export const authOptions = {
-  secret: process.env.SECRET,
+// ❌ don't export this from a route file
+const authOptions = {
+  // use NEXTAUTH_SECRET for NextAuth
+  secret: process.env.NEXTAUTH_SECRET ?? process.env.SECRET,
   session: { strategy: 'jwt' },
 
   providers: [
@@ -36,7 +42,7 @@ export const authOptions = {
         return {
           id: user._id.toString(),
           email: user.email,
-          admin: !!user.admin, // <<< this is what we'll read on the client
+          admin: !!user.admin,
         };
       },
     }),
@@ -53,7 +59,7 @@ export const authOptions = {
     async session({ session, token }) {
       if (session.user) {
         session.user.id    = token.userId;
-        session.user.admin = token.admin ?? false; // <<< available on client
+        session.user.admin = token.admin ?? false;
       }
       return session;
     },
@@ -61,4 +67,6 @@ export const authOptions = {
 };
 
 const handler = NextAuth(authOptions);
+
+// ✅ only export HTTP methods (allowed in route files)
 export { handler as GET, handler as POST };
