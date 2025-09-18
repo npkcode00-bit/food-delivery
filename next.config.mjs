@@ -1,4 +1,11 @@
+// next.config.mjs
 /** @type {import('next').NextConfig} */
-const nextConfig = {};
+const nextConfig = {
+  images: {
+    remotePatterns: [
+      { protocol: 'https', hostname: '**.public.blob.vercel-storage.com' },
+    ],
+  },
+};
 
-export default nextConfig;
+export default nextConfig;   // <-- ESM export

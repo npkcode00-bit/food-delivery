@@ -5,7 +5,6 @@ import CredentialsProvider from 'next-auth/providers/credentials';
 import bcrypt from 'bcrypt';
 import { User } from '../../../models/User';
 
-// (optional but recommended for bcrypt)
 export const runtime = 'nodejs';
 
 async function dbConnect() {
@@ -13,9 +12,8 @@ async function dbConnect() {
   await mongoose.connect(process.env.MONGO_URL);
 }
 
-// ❌ don't export this from a route file
-const authOptions = {
-  // use NEXTAUTH_SECRET for NextAuth
+// ✅ export this so other routes can import it
+export const authOptions = {
   secret: process.env.NEXTAUTH_SECRET ?? process.env.SECRET,
   session: { strategy: 'jwt' },
 
@@ -67,6 +65,4 @@ const authOptions = {
 };
 
 const handler = NextAuth(authOptions);
-
-// ✅ only export HTTP methods (allowed in route files)
 export { handler as GET, handler as POST };
