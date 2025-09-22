@@ -9,38 +9,27 @@ export default function Home() {
       <Hero />
       <HomeMenu />
 
-      <section className="text-center my-16">
-        <SectionHeaders subHeader={"Our story"} mainHeader={"About us"} />
-
+   <section className="text-center my-16" id="about">
+        <SectionHeaders
+          subHeader={'Our story'}
+          mainHeader={'About us'}
+        />
         <div className="text-gray-500 max-w-md mx-auto mt-4 flex flex-col gap-4">
           <p>
-            It is a long established fact that a reader will be distracted by
-            the readable content of a page when looking at its layout. The point
-            of using Lorem Ipsum is that it has a more-or-less normal distribution
-            of letters, as opposed to using &apos;Content here, content here&apos;,
-            making it look like readable English.
+            Lorem ipsum dolor sit amet, consectetur adipisicing elit. Magni minima odit recusandae. Illum ipsa non repudiandae? Eum ipsam iste quos suscipit tempora? Aperiam esse fugiat inventore laboriosam officiis quam rem!
           </p>
-
-          <p>
-            Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots
-            in a piece of classical Latin literature from 45 BC, making it over 2000 years old.
-            Richard McClintock, a Latin professor at Hampden-Sydney College in Virginia,
-            looked up one of the more obscure Latin words, consectetur, from a Lorem Ipsum.
-          </p>
-
-          <p>
-            Contrary to popular belief, Lorem Ipsum is not simply random text. It has roots
-            in a piece of classical Latin literature from 45 BC, making it over 2000 years old.
-          </p>
+          <p>At consectetur delectus ducimus est facere iure molestias obcaecati quaerat vitae voluptate? Aspernatur dolor explicabo iste minus molestiae pariatur provident quibusdam saepe?</p>
+          <p>Laborum molestias neque nulla obcaecati odio quia quod reprehenderit sit vitae voluptates? Eos, tenetur.</p>
         </div>
       </section>
-
-      <section className="text-center my-8">
-        <SectionHeaders subHeader={"Don't hesitate"} mainHeader={"Contact us"} />
-
+      <section className="text-center my-8" id="contact">
+        <SectionHeaders
+          subHeader={'Don\'t hesitate'}
+          mainHeader={'Contact us'}
+        />
         <div className="mt-8">
-          <a className="text-4xl underline text-gray-500" href="tel:+09312341232">
-            <h1>+09 762 2324</h1>
+          <a className="text-4xl underline text-gray-500" href="tel:+46738123123">
+            +46 738 123 123
           </a>
         </div>
       </section>

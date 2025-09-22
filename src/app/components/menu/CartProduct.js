@@ -1,5 +1,5 @@
 import {cartProductPrice} from "../AppContext";
-import Trash from "@/components/icons/Trash";
+import Trash from "../icons/Trash";
 import Image from "next/image";
 
 export default function CartProduct({product,onRemove}) {
