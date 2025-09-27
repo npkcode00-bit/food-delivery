@@ -21,7 +21,7 @@ function AuthLinks({ status, userName }) {
         )}
         <button
           onClick={() => signOut()}
-          className="bg-primary rounded-full text-white px-8 py-2"
+          className="bg-primary rounded-full text-white px-8 py-2 cursor-pointer"
         >
           Logout
         </button>
@@ -39,18 +39,34 @@ function AuthLinks({ status, userName }) {
   );
 }
 
+function CartLink({ count }) {
+  return (
+    <Link href="/cart" className="relative" aria-label={`Shopping cart${count ? ` with ${count} items` : ''}`}>
+      <ShoppingCart />
+      {count > 0 && (
+        <span className="absolute -top-2 -right-4 bg-primary text-white text-xs py-1 px-1 rounded-full leading-3">
+          {count}
+        </span>
+      )}
+    </Link>
+  );
+}
+
 export default function Header() {
   const { data: session, status } = useSession();
   const user = session?.user;
   const isAdmin = !!user?.admin;
+  const isAuthed = status === 'authenticated';
 
   let userName = user?.name || user?.email || '';
   if (userName.includes(' ')) userName = userName.split(' ')[0];
 
   const { cartProducts } = useContext(CartContext);
+  const cartCount = cartProducts?.length || 0;
+
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
-  const brandTitle = 'ST PIZZA'; // change if needed
+  const brandTitle = 'ST PIZZA';
 
   return (
     <header>
@@ -60,14 +76,7 @@ export default function Header() {
           {brandTitle}
         </Link>
         <div className="flex gap-8 items-center">
-          <Link href="/cart" className="relative">
-            <ShoppingCart />
-            {cartProducts?.length > 0 && (
-              <span className="absolute -top-2 -right-4 bg-primary text-white text-xs py-1 px-1 rounded-full leading-3">
-                {cartProducts.length}
-              </span>
-            )}
-          </Link>
+          {isAuthed && <CartLink count={cartCount} />}
           <button
             className="p-1 border"
             onClick={() => setMobileNavOpen((prev) => !prev)}
@@ -108,14 +117,7 @@ export default function Header() {
 
         <nav className="flex items-center gap-4 text-gray-500 font-semibold">
           <AuthLinks status={status} userName={userName} />
-          <Link href="/cart" className="relative">
-            <ShoppingCart />
-            {cartProducts?.length > 0 && (
-              <span className="absolute -top-2 -right-4 bg-primary text-white text-xs py-1 px-1 rounded-full leading-3">
-                {cartProducts.length}
-              </span>
-            )}
-          </Link>
+          {isAuthed && <CartLink count={cartCount} />}
         </nav>
       </div>
     </header>

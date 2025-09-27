@@ -1,4 +1,5 @@
 'use client';
+
 import Link from 'next/link';
 import { useState } from 'react';
 
@@ -22,6 +23,7 @@ export default function RegisterPage() {
 
     setCreatingUser(true);
     setError('');
+
     try {
       const res = await fetch('/api/register', {
         method: 'POST',
@@ -35,7 +37,7 @@ export default function RegisterPage() {
       } else {
         setUserCreated(true);
       }
-    } catch (e) {
+    } catch {
       setError('Network error. Please try again.');
     } finally {
       setCreatingUser(false);

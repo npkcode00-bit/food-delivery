@@ -1,4 +1,3 @@
-// src/app/api/auth/[...nextauth]/route.js
 import mongoose from 'mongoose';
 import NextAuth from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
@@ -12,17 +11,23 @@ async function dbConnect() {
   await mongoose.connect(process.env.MONGO_URL);
 }
 
-// ✅ export this so other routes can import it
+// Export so other routes can import if needed
 export const authOptions = {
   secret: process.env.NEXTAUTH_SECRET ?? process.env.SECRET,
   session: { strategy: 'jwt' },
+
+  // Use your custom login page for sign-in + errors
+  pages: {
+    signIn: '/login',
+    error: '/login',
+  },
 
   providers: [
     CredentialsProvider({
       id: 'credentials',
       name: 'Credentials',
       credentials: {
-        email:    { label: 'Email', type: 'email', placeholder: 'text@example.com' },
+        email: { label: 'Email', type: 'email', placeholder: 'text@example.com' },
         password: { label: 'Password', type: 'password' },
       },
       async authorize(credentials) {
@@ -32,7 +37,7 @@ export const authOptions = {
 
         await dbConnect();
         const user = await User.findOne({ email }).lean();
-        if (!user) return null;
+        if (!user || !user.password) return null;
 
         const ok = await bcrypt.compare(password, user.password);
         if (!ok) return null;
@@ -50,13 +55,13 @@ export const authOptions = {
     async jwt({ token, user }) {
       if (user) {
         token.userId = user.id;
-        token.admin  = user.admin ?? false;
+        token.admin = user.admin ?? false;
       }
       return token;
     },
     async session({ session, token }) {
       if (session.user) {
-        session.user.id    = token.userId;
+        session.user.id = token.userId;
         session.user.admin = token.admin ?? false;
       }
       return session;

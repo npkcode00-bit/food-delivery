@@ -1,4 +1,3 @@
-// models/User.js
 import { Schema, model, models } from 'mongoose';
 import bcrypt from 'bcrypt';
 
@@ -7,22 +6,26 @@ const UserSchema = new Schema(
     email: {
       type: String,
       required: true,
-      unique: true,
+      unique: true,   // unique index at DB level
       lowercase: true,
       trim: true,
+      index: true,
     },
     password: {
       type: String,
-      required: true,          // <-- DO NOT mark password as unique
+      required: true, // DO NOT set unique here
     },
     admin: {
       type: Boolean,
-      default: false,          // <-- auto-populates for NEW users
+      default: false,
       index: true,
     },
   },
   { timestamps: true }
 );
+
+// Ensure the unique index is created (helps in prod)
+UserSchema.index({ email: 1 }, { unique: true });
 
 UserSchema.pre('save', async function (next) {
   if (!this.isModified('password')) return next();
