@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 import { NextResponse } from 'next/server';
 import { MenuItem } from '../../models/MenuItem';
 import { getServerSession } from 'next-auth';
-import { authOptions } from '../auth/[...nextauth]/route';
+import { authOptions } from '../auth/[...nextauth]/auth';
 
 // NextAuth relies on Node APIs; avoid Edge.
 export const runtime = 'nodejs';
