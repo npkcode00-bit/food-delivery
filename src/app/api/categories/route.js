@@ -1,8 +1,8 @@
 import mongoose from 'mongoose';
 import { NextResponse } from 'next/server';
-import { Category } from '../../../models/Category';
+import { Category } from '../../models/Category';
 import { getServerSession } from 'next-auth';
-import { authOptions } from '../auth/[...nextauth]/route';
+import { authOptions } from '../auth/[...nextauth]/auth';
 
 // Force Node runtime (NextAuth doesn't run on edge)
 export const runtime = 'nodejs';
