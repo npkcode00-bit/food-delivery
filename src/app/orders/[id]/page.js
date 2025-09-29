@@ -1,81 +1,47 @@
 'use client';
-import {CartContext, cartProductPrice} from "../../components/AppContext";
-import AddressInputs from "../../components/layout/AddressInputs";
-import SectionHeaders from "../../components/layout/SectionHeaders";
-import CartProduct from "../../components/menu/CartProduct";
-import {useParams} from "next/navigation";
-import {useContext, useEffect, useState} from "react";
+import { useRouter } from 'next/navigation';
+import { useState } from 'react';
 
-export default function OrderPage() {
-  const {clearCart} = useContext(CartContext);
-  const [order, setOrder] = useState();
-  const [loadingOrder, setLoadingOrder] = useState(true);
-  const {id} = useParams();
-  useEffect(() => {
-    if (typeof window.console !== "undefined") {
-      if (window.location.href.includes('clear-cart=1')) {
-        clearCart();
-      }
-    }
-    if (id) {
-      setLoadingOrder(true);
-      fetch('/api/orders?_id='+id).then(res => {
-        res.json().then(orderData => {
-          setOrder(orderData);
-          setLoadingOrder(false);
-        });
-      })
-    }
-  }, []);
+// TODO: replace with your real auth (e.g., NextAuth useSession)
+function useAuth() {
+  return { isAuthenticated: true }; // change to !!session
+}
 
-  let subtotal = 0;
-  if (order?.cartProducts) {
-    for (const product of order?.cartProducts) {
-      subtotal += cartProductPrice(product);
-    }
+export default function OrdersIndexPage() {
+  const { isAuthenticated } = useAuth();
+  const router = useRouter();
+  const [orderId, setOrderId] = useState('');
+
+  if (!isAuthenticated) {
+    return (
+      <section className="max-w-xl mx-auto mt-10">
+        <div className="rounded-xl border border-slate-200 p-6 bg-slate-50">
+          <h3 className="font-semibold text-lg">Login required</h3>
+          <p className="text-slate-600 mt-1">Sign in to view your orders.</p>
+        </div>
+      </section>
+    );
   }
 
   return (
-    <section className="max-w-2xl mx-auto mt-8">
-      <div className="text-center">
-        <SectionHeaders mainHeader="Your order" />
-        <div className="mt-4 mb-8">
-          <p>Thanks for your order.</p>
-          <p>We will call you when your order will be on the way.</p>
-        </div>
-      </div>
-      {loadingOrder && (
-        <div>Loading order...</div>
-      )}
-      {order && (
-        <div className="grid md:grid-cols-2 md:gap-16">
-          <div>
-            {order.cartProducts.map(product => (
-              <CartProduct key={product._id} product={product} />
-            ))}
-            <div className="text-right py-2 text-gray-500">
-              Subtotal:
-              <span className="text-black font-bold inline-block w-8">${subtotal}</span>
-              <br />
-              Delivery:
-              <span className="text-black font-bold inline-block w-8">$5</span>
-              <br />
-              Total:
-              <span className="text-black font-bold inline-block w-8">
-                ${subtotal + 5}
-              </span>
-            </div>
-          </div>
-          <div>
-            <div className="bg-gray-100 p-4 rounded-lg">
-              <AddressInputs
-                disabled={true}
-                addressProps={order}
-              />
-            </div>
-          </div>
-        </div>
-      )}
+    <section className="max-w-xl mx-auto mt-10">
+      <h1 className="text-2xl font-bold">Find your order</h1>
+      <p className="text-slate-600 mt-1">Enter your order ID to view details.</p>
+      <form
+        className="mt-4 flex gap-2"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (orderId.trim()) router.push(`/orders/${orderId.trim()}`);
+        }}
+      >
+        <input
+          className="flex-1 px-3 py-2 border rounded-lg"
+          placeholder="e.g. A1234"
+          value={orderId}
+          onChange={(e) => setOrderId(e.target.value)}
+        />
+        <button className="px-4 py-2 rounded-lg bg-black text-white font-semibold">Open</button>
+      </form>
     </section>
   );
 }
