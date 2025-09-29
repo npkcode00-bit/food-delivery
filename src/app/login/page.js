@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
 import { signIn } from 'next-auth/react';
 
 function getErrorMessage(code) {
@@ -16,7 +16,7 @@ function getErrorMessage(code) {
   }
 }
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -25,7 +25,6 @@ export default function LoginPage() {
   const [loginInProgress, setLoginInProgress] = useState(false);
   const [error, setError] = useState('');
 
-  // If NextAuth ever appends ?error=..., show it inline (but we won't redirect anymore)
   useEffect(() => {
     const err = searchParams.get('error');
     if (err) setError(getErrorMessage(err));
@@ -40,13 +39,13 @@ export default function LoginPage() {
       const res = await signIn('credentials', {
         email,
         password,
-        redirect: false, // <— prevents redirect to /api/auth/signin
+        redirect: false,
       });
 
       if (res?.error) {
         setError(getErrorMessage(res.error));
       } else {
-        router.push('/'); // success
+        router.push('/');
       }
     } catch {
       setError('Network error. Please try again.');
@@ -96,5 +95,13 @@ export default function LoginPage() {
         </div>
       </form>
     </section>
+  );
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div className="text-center mt-8">Loading...</div>}>
+      <LoginForm />
+    </Suspense>
   );
 }

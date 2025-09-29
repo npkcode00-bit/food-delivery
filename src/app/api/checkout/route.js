@@ -1,11 +1,10 @@
-// src/app/api/checkout/route.js
 import mongoose from 'mongoose';
 import { getServerSession } from 'next-auth';
-import { authOptions } from '../../api/auth/[...nextauth]/route';
+import { authOptions } from '../auth/[...nextauth]/auth';
 import { MenuItem } from '../../models/MenuItem';
 import { Order } from '../../models/Order';
 
-export const runtime = 'nodejs'; // ensure Node runtime (not edge) for fetch to PayMongo
+export const runtime = 'nodejs';
 
 async function dbConnect() {
   if (mongoose.connection.readyState >= 1) return;
@@ -13,7 +12,6 @@ async function dbConnect() {
 }
 
 function toCentavos(num) {
-  // expects PHP prices in your DB; multiply by 100 -> integer centavos
   return Math.round(Number(num || 0) * 100);
 }
 
@@ -26,26 +24,32 @@ export async function POST(req) {
       return Response.json({ error: 'Cart is empty' }, { status: 400 });
     }
 
-    // Get logged-in user (optional)
+    // Get logged-in user
     let userEmail = '';
     try {
       const session = await getServerSession(authOptions);
       userEmail = session?.user?.email || '';
-    } catch (_) {
-      // ignore if authOptions not available; guest checkout still works
+    } catch (err) {
+      console.error('Session error:', err);
+    }
+
+    // Validate email exists (either from session or address)
+    const billingEmail = userEmail || address?.email || '';
+    if (!billingEmail) {
+      return Response.json({ 
+        error: 'Email is required for checkout' 
+      }, { status: 400 });
     }
 
     // Persist order (unpaid)
     const orderDoc = await Order.create({
-      userEmail,
+      userEmail: billingEmail,
       ...address,
       cartProducts,
       paid: false,
-      currency: 'PHP',
-      provider: 'paymongo',
     });
 
-    // Build PayMongo line items (PHP centavos)
+    // Build PayMongo line items
     const lineItems = [];
     for (const cartProduct of cartProducts) {
       const productInfo = await MenuItem.findById(cartProduct._id).lean();
@@ -74,7 +78,7 @@ export async function POST(req) {
       }
 
       const unitAmount = toCentavos(productPrice);
-      const quantity = 1; // or cartProduct.quantity ?? 1
+      const quantity = 1;
       const name = cartProduct.name || productInfo.name || 'Item';
 
       lineItems.push({
@@ -83,12 +87,11 @@ export async function POST(req) {
         name,
         description: productInfo.description ? String(productInfo.description).slice(0, 250) : undefined,
         quantity,
-        // images: ['https://...'] // optional
       });
     }
 
-    // Add delivery fee (PHP). Adjust as you wish.
-    const DELIVERY_FEE_PHP = Number(process.env.DELIVERY_FEE_PHP || 50); // ₱50 default
+    // Add delivery fee
+    const DELIVERY_FEE_PHP = Number(process.env.DELIVERY_FEE_PHP || 50);
     if (DELIVERY_FEE_PHP > 0) {
       lineItems.push({
         amount: toCentavos(DELIVERY_FEE_PHP),
@@ -98,16 +101,15 @@ export async function POST(req) {
       });
     }
 
-    // Absolute URLs for redirects
+    // URLs for redirects
     const envOrigin = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL;
     const origin = envOrigin || new URL(req.url).origin;
     const base = origin.endsWith('/') ? origin : origin + '/';
 
-    // Build PayMongo Checkout Session payload
+    // PayMongo Checkout Session payload
     const payload = {
       data: {
         attributes: {
-          // Only allow GCash on the checkout
           payment_method_types: ['gcash'],
           description: `Order ${orderDoc._id}`,
           reference_number: String(orderDoc._id),
@@ -115,10 +117,9 @@ export async function POST(req) {
           send_email_receipt: true,
           success_url: `${base}orders/${orderDoc._id}?clear-cart=1`,
           cancel_url: `${base}cart?canceled=1`,
-          // Optional: prefill billing for the hosted page
           billing: {
-            name: address?.name || '',
-            email: userEmail || address?.email || '',
+            name: address?.name || 'Customer',
+            email: billingEmail, // CRITICAL: Must not be blank
             phone: address?.phone || '',
             address: {
               line1: address?.streetAddress || '',
@@ -131,7 +132,6 @@ export async function POST(req) {
       },
     };
 
-    // Auth header: PayMongo expects Basic auth with your SECRET key
     const secret = process.env.PAYMONGO_SECRET_KEY;
     if (!secret) {
       return Response.json({ error: 'PAYMONGO_SECRET_KEY missing' }, { status: 500 });
@@ -146,7 +146,6 @@ export async function POST(req) {
         'Accept': 'application/json',
       },
       body: JSON.stringify(payload),
-      // If your Node version/hosting requires, you can add: cache: 'no-store'
     });
 
     const data = await resp.json();
@@ -156,7 +155,6 @@ export async function POST(req) {
     }
 
     const checkoutUrl = data?.data?.attributes?.checkout_url;
-    // PayMongo Checkout Session returns a checkout_url to redirect users to. :contentReference[oaicite:1]{index=1}
     if (!checkoutUrl) {
       return Response.json({ error: 'No checkout_url from PayMongo' }, { status: 502 });
     }

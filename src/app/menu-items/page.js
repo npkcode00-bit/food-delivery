@@ -28,6 +28,8 @@ export default function MenuItemsPage() {
   if (status === 'unauthenticated') return 'Please log in.'
   if (!isAdmin) return 'Not an admin.'
 
+  const FALLBACK_SRC = "/no-image.jpg";
+
   return (
     <section className="mt-8 max-w-2xl mx-auto">
       <UserTabs isAdmin={isAdmin} />
@@ -52,7 +54,7 @@ export default function MenuItemsPage() {
                 <div className="relative">
                   <Image
                     className="rounded-md"
-                    src={item.image}
+                    src={item.image || FALLBACK_SRC}
                     alt={item.name ?? ''}
                     width={200}
                     height={200}
