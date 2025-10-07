@@ -98,6 +98,7 @@ export default function Header() {
           <Link href="/menu">Menu</Link>
           <Link href="/#about">About</Link>
           <Link href="/#contact">Contact</Link>
+          {isAuthed && <Link href="/orders">Orders</Link>}
           {isAdmin && <Link href="/admin">Admin</Link>}
           <AuthLinks status={status} userName={userName} />
         </div>
@@ -113,6 +114,7 @@ export default function Header() {
           <Link href="/menu">Menu</Link>
           <Link href="/#about">About</Link>
           <Link href="/#contact">Contact</Link>
+          {isAuthed && <Link href="/orders" className='mr-2'>Orders</Link>}
           {isAdmin && <Link href="/admin">Admin</Link>}
         </nav>
 

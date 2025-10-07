@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../auth/[...nextauth]/auth';
 import { MenuItem } from '../../models/MenuItem';
-import { Order } from '../../models/Order';
+import { CheckoutIntent } from '../../models/CheckoutIntent';
 
 export const runtime = 'nodejs';
 
@@ -24,7 +24,7 @@ export async function POST(req) {
       return Response.json({ error: 'Cart is empty' }, { status: 400 });
     }
 
-    // Get logged-in user
+    // Get logged-in user (optional)
     let userEmail = '';
     try {
       const session = await getServerSession(authOptions);
@@ -36,21 +36,14 @@ export async function POST(req) {
     // Validate email exists (either from session or address)
     const billingEmail = userEmail || address?.email || '';
     if (!billingEmail) {
-      return Response.json({ 
-        error: 'Email is required for checkout' 
-      }, { status: 400 });
+      return Response.json({ error: 'Email is required for checkout' }, { status: 400 });
     }
 
-    // Persist order (unpaid)
-    const orderDoc = await Order.create({
-      userEmail: billingEmail,
-      ...address,
-      cartProducts,
-      paid: false,
-    });
-
-    // Build PayMongo line items
+    // Build line items and calculate total price
     const lineItems = [];
+    const enrichedCartProducts = [];
+    let totalPrice = 0;
+
     for (const cartProduct of cartProducts) {
       const productInfo = await MenuItem.findById(cartProduct._id).lean();
       if (!productInfo) {
@@ -59,12 +52,29 @@ export async function POST(req) {
 
       let productPrice = Number(productInfo.basePrice) || 0;
 
+      // Enriched product with full price info
+      const enrichedProduct = {
+        _id: String(cartProduct._id),
+        name: cartProduct.name || productInfo.name || 'Item',
+        basePrice: Number(productInfo.basePrice) || 0,
+        size: null,
+        extras: [],
+      };
+
       // Size price
       if (cartProduct.size?._id) {
         const sizeInfo = productInfo.sizes?.find(
           s => String(s._id) === String(cartProduct.size._id)
         );
-        if (sizeInfo?.price) productPrice += Number(sizeInfo.price);
+        if (sizeInfo) {
+          const sizePrice = Number(sizeInfo.price) || 0;
+          productPrice += sizePrice;
+          enrichedProduct.size = {
+            _id: String(sizeInfo._id),
+            name: sizeInfo.name || '',
+            price: sizePrice,
+          };
+        }
       }
 
       // Extras price
@@ -73,20 +83,27 @@ export async function POST(req) {
           const extraInfo = productInfo.extraIngredientPrices?.find(
             e => String(e._id) === String(extra._id)
           );
-          if (extraInfo?.price) productPrice += Number(extraInfo.price);
+          if (extraInfo) {
+            const extraPrice = Number(extraInfo.price) || 0;
+            productPrice += extraPrice;
+            enrichedProduct.extras.push({
+              _id: String(extraInfo._id),
+              name: extraInfo.name || '',
+              price: extraPrice,
+            });
+          }
         }
       }
 
-      const unitAmount = toCentavos(productPrice);
-      const quantity = 1;
-      const name = cartProduct.name || productInfo.name || 'Item';
+      enrichedCartProducts.push(enrichedProduct);
+      totalPrice += productPrice;
 
       lineItems.push({
-        amount: unitAmount,
+        amount: toCentavos(productPrice),
         currency: 'PHP',
-        name,
+        name: enrichedProduct.name,
         description: productInfo.description ? String(productInfo.description).slice(0, 250) : undefined,
-        quantity,
+        quantity: 1,
       });
     }
 
@@ -99,7 +116,28 @@ export async function POST(req) {
         name: 'Delivery fee',
         quantity: 1,
       });
+      totalPrice += DELIVERY_FEE_PHP;
     }
+
+    // ✅ Create a CheckoutIntent (NO Order yet)
+    const intent = await CheckoutIntent.create({
+      userEmail: billingEmail,
+      address: {
+        name: address?.name || '',
+        phone: address?.phone || '',
+        streetAddress: address?.streetAddress || '',
+        city: address?.city || '',
+        postalCode: address?.postalCode || '',
+        country: address?.country || 'PH',
+        email: billingEmail,
+      },
+      cartProducts: enrichedCartProducts,
+      lineItems,
+      totalPrice,
+      status: 'open',
+    });
+
+    const intentId = String(intent._id);
 
     // URLs for redirects
     const envOrigin = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL;
@@ -111,15 +149,18 @@ export async function POST(req) {
       data: {
         attributes: {
           payment_method_types: ['gcash'],
-          description: `Order ${orderDoc._id}`,
-          reference_number: String(orderDoc._id),
+          description: `CheckoutIntent ${intentId}`,
+          reference_number: intentId,
+          metadata: { intentId },
+
           line_items: lineItems,
           send_email_receipt: true,
-          success_url: `${base}orders/${orderDoc._id}?clear-cart=1`,
+          // ✅ FIXED: Redirect to intent page, which will show order once created
+          success_url: `${base}orders?intent=${intentId}&clear-cart=1`,
           cancel_url: `${base}cart?canceled=1`,
           billing: {
             name: address?.name || 'Customer',
-            email: billingEmail, // CRITICAL: Must not be blank
+            email: billingEmail,
             phone: address?.phone || '',
             address: {
               line1: address?.streetAddress || '',
@@ -155,10 +196,18 @@ export async function POST(req) {
     }
 
     const checkoutUrl = data?.data?.attributes?.checkout_url;
+    const checkoutSessionId = data?.data?.id;
+
     if (!checkoutUrl) {
       return Response.json({ error: 'No checkout_url from PayMongo' }, { status: 502 });
     }
 
+    // Save the PayMongo session id on the intent
+    if (checkoutSessionId) {
+      await CheckoutIntent.findByIdAndUpdate(intentId, { checkoutSessionId });
+    }
+
+    // Return PayMongo hosted checkout URL (frontend should redirect the browser)
     return Response.json(checkoutUrl);
   } catch (err) {
     console.error('Checkout error:', err);

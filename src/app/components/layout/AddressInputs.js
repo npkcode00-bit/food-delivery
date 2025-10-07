@@ -4,9 +4,19 @@ export default function AddressInputs({addressProps,setAddressProp,disabled=fals
     <>
       <label>Phone</label>
       <input
+       
         disabled={disabled}
-        type="tel" placeholder="Phone number"
-        value={phone || ''} onChange={ev => setAddressProp('phone', ev.target.value)} />
+        type="text"
+        placeholder="Phone number"
+        inputMode="numeric"
+        pattern="[0-9]*"
+        maxLength={11} // ← optional, set what you need
+        value={phone ?? ''}
+        onChange={(e) =>
+          setAddressProp('phone', e.target.value.replace(/\D/g, ''))
+        }
+      />
+
       <label>Street address</label>
       <input
         disabled={disabled}

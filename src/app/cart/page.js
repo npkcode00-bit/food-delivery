@@ -146,8 +146,8 @@ export default function CartPage() {
           </div>
         </div>
 
-        <div className="bg-gray-100 p-4 rounded-lg">
-          <h2>Checkout</h2>
+        <div className="bg-gray-100 p-4 rounded-lg" >
+          <h2 style={{fontWeight:600, textTransform:'uppercase', marginBottom:'20px',textAlign:'center'}}>Checkout</h2>
           <form onSubmit={proceedToCheckout}>
             <AddressInputs
               addressProps={address}

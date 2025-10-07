@@ -63,23 +63,28 @@ export default function MenuItem(menuItem) {
             <div
               className="overflow-y-scroll p-2"
               style={{maxHeight:'calc(100vh - 100px)'}}>
-              <Image
-                src={image}
-                alt={name}
-                width={300} height={200}
-                className="mx-auto" />
-              <h2 className="text-lg font-bold text-center mb-2">{name}</h2>
-              <p className="text-center text-gray-500 text-sm mb-2">
-                {description}
-              </p>
+
+                <div style={{border:'2px solid black'}}>
+                      <Image
+                    src={image}
+                    alt={name}
+                    width={300} height={200}
+                    className="mx-auto" />
+                  <h2 className="text-lg font-bold text-center mb-2">{name}</h2>
+                  <p className="text-center text-gray-500 text-sm mb-2">
+                    {description}
+                  </p>
+                </div>
+              
               {sizes?.length > 0 && (
                 <div className="py-2">
-                  <h3 className="text-center text-gray-700">Pick your size</h3>
+                  <h3 className="text-center text-gray-700 mb-3">Pick your size</h3>
                   {sizes.map(size => (
                     <label
                       key={size._id}
                       className="flex items-center gap-2 p-4 border rounded-md mb-1">
                       <input
+                      className="cursor-pointer"
                         type="radio"
                         onChange={() => setSelectedSize(size)}
                         checked={selectedSize?.name === size.name}
@@ -91,12 +96,13 @@ export default function MenuItem(menuItem) {
               )}
               {extraIngredientPrices?.length > 0 && (
                 <div className="py-2">
-                  <h3 className="text-center text-gray-700">Any extras?</h3>
+                  <h3 className="text-center text-gray-700 mb-3">Any extras?</h3>
                   {extraIngredientPrices.map(extraThing => (
                     <label
                       key={extraThing._id}
                       className="flex items-center gap-2 p-4 border rounded-md mb-1">
                       <input
+                      className="cursor-pointer"
                         type="checkbox"
                         onChange={ev => handleExtraThingClick(ev, extraThing)}
                         checked={selectedExtras.map(e => e._id).includes(extraThing._id)}
@@ -112,7 +118,14 @@ export default function MenuItem(menuItem) {
                 src={image}>
                 <div className="primary sticky bottom-2"
                      onClick={handleAddToCartButtonClick}>
-                  Add to cart ${selectedPrice}
+                       <button
+                        type="button"
+                    
+                        style={{color:'white'}}
+                        className="mt-4 bg-primary text-white rounded-full px-8 py-2 cursor-pointer border-2"
+                      >
+                      Add to cart ${selectedPrice}
+                  </button>
                 </div>
               </FlyingButton>
               <button

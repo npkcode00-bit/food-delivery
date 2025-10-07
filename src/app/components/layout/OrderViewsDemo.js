@@ -180,13 +180,30 @@ function StatusStepper({ status }) {
 
 function OrderDetails({ order }) {
   const total = useMemo(() => {
-    if (typeof order.total === 'number') return order.total;
+    if (typeof order.totalPrice === 'number') return order.totalPrice;
+    
     if (order.cartProducts && Array.isArray(order.cartProducts)) {
-      return order.cartProducts.reduce((sum, item) => sum + (item.price || 0), 0);
+      return order.cartProducts.reduce((sum, item) => {
+        let itemPrice = item.basePrice || 0;
+        
+        if (item.size?.price) {
+          itemPrice += item.size.price;
+        }
+        
+        if (item.extras && Array.isArray(item.extras)) {
+          item.extras.forEach(extra => {
+            itemPrice += extra.price || 0;
+          });
+        }
+        
+        return sum + itemPrice;
+      }, 0);
     }
+    
     if (order.items && Array.isArray(order.items)) {
       return order.items.reduce((sum, it) => sum + it.qty * it.price, 0);
     }
+    
     return 0;
   }, [order]);
 
@@ -203,12 +220,35 @@ function OrderDetails({ order }) {
 
   const orderItems = useMemo(() => {
     if (order.cartProducts && Array.isArray(order.cartProducts)) {
-      return order.cartProducts.map((item, index) => ({
-        id: item._id || index,
-        name: item.name || 'Unknown Item',
-        qty: 1,
-        price: item.price || 0
-      }));
+      return order.cartProducts.map((item, index) => {
+        let itemPrice = item.basePrice || 0;
+        
+        if (item.size?.price) {
+          itemPrice += item.size.price;
+        }
+        
+        if (item.extras && Array.isArray(item.extras)) {
+          item.extras.forEach(extra => {
+            itemPrice += extra.price || 0;
+          });
+        }
+        
+        let itemName = item.name || 'Unknown Item';
+        if (item.size?.name) {
+          itemName += ` (${item.size.name})`;
+        }
+        if (item.extras && item.extras.length > 0) {
+          const extrasNames = item.extras.map(e => e.name).join(', ');
+          itemName += ` + ${extrasNames}`;
+        }
+        
+        return {
+          id: item._id || index,
+          name: itemName,
+          qty: 1,
+          price: itemPrice
+        };
+      });
     }
     return order.items || [];
   }, [order]);
@@ -299,66 +339,65 @@ function AdminActions({ order, onChange, onRefresh, onDelete }) {
     }
   };
 
- const handleDelete = async () => {
-  const orderId = order._id?.slice(-6).toUpperCase() || order.id;
-  
-  // Create a custom toast with confirmation buttons
-  toast((t) => (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <div>
-        Are you sure you want to delete order #{orderId}? This action cannot be undone.
+  const handleDelete = async () => {
+    const orderId = order._id?.slice(-6).toUpperCase() || order.id;
+    
+    toast((t) => (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+        <div>
+          Are you sure you want to delete order #{orderId}? This action cannot be undone.
+        </div>
+        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          <button
+            onClick={() => toast.dismiss(t.id)}
+            style={{
+              padding: '6px 12px',
+              borderRadius: 8,
+              border: '1px solid #e5e7eb',
+              background: '#fff',
+              cursor: 'pointer',
+              fontWeight: 600,
+            }}
+          >
+            Cancel
+          </button>
+          <button
+            onClick={async () => {
+              toast.dismiss(t.id);
+              
+              setLoading('delete');
+              const res = await deleteOrder(order._id);
+              setLoading(null);
+              
+              if (res.ok) {
+                toast.success('Order deleted successfully');
+                if (onDelete) onDelete(order._id);
+                if (onRefresh) onRefresh();
+              } else {
+                toast.error(res.error || 'Failed to delete order');
+              }
+            }}
+            style={{
+              padding: '6px 12px',
+              borderRadius: 8,
+              border: '1px solid #991b1b',
+              background: '#991b1b',
+              color: '#fff',
+              cursor: 'pointer',
+              fontWeight: 600,
+            }}
+          >
+            Delete
+          </button>
+        </div>
       </div>
-      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-        <button
-          onClick={() => toast.dismiss(t.id)}
-          style={{
-            padding: '6px 12px',
-            borderRadius: 8,
-            border: '1px solid #e5e7eb',
-            background: '#fff',
-            cursor: 'pointer',
-            fontWeight: 600,
-          }}
-        >
-          Cancel
-        </button>
-        <button
-          onClick={async () => {
-            toast.dismiss(t.id);
-            
-            setLoading('delete');
-            const res = await deleteOrder(order._id);
-            setLoading(null);
-            
-            if (res.ok) {
-              toast.success('Order deleted successfully');
-              if (onDelete) onDelete(order._id);
-              if (onRefresh) onRefresh();
-            } else {
-              toast.error(res.error || 'Failed to delete order');
-            }
-          }}
-          style={{
-            padding: '6px 12px',
-            borderRadius: 8,
-            border: '1px solid #991b1b',
-            background: '#991b1b',
-            color: '#fff',
-            cursor: 'pointer',
-            fontWeight: 600,
-          }}
-        >
-          Delete
-        </button>
-      </div>
-    </div>
-  ), {
-    duration: 10000,
-    style: {
-      minWidth: '350px',
-    },
-  });
-};
+    ), {
+      duration: 10000,
+      style: {
+        minWidth: '350px',
+      },
+    });
+  };
 
   return (
     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -394,7 +433,6 @@ function OrderCard({ initialOrder, role, onRefresh, onDelete }) {
   const [order, setOrder] = useState(initialOrder);
   const [open, setOpen] = useState(false);
 
-  // Update local state when prop changes (from polling)
   useMemo(() => {
     setOrder(initialOrder);
   }, [initialOrder]);
@@ -445,13 +483,63 @@ export default function OrderViewsDemo({ orders = [], onOrderUpdate }) {
 
   const filteredOrders = orders.filter(order => {
     if (!search) return true;
-    const searchLower = search.toLowerCase();
+    
+    const searchLower = search.toLowerCase().trim();
+    
+    // Search by Order ID
     const orderId = order._id?.slice(-6).toUpperCase() || '';
-    return (
-      orderId.includes(searchLower.toUpperCase()) ||
-      order.phone?.includes(search) ||
-      order.userEmail?.toLowerCase().includes(searchLower)
-    );
+    if (orderId.includes(searchLower.toUpperCase())) return true;
+    
+    // Search by Phone
+    if (order.phone?.includes(search)) return true;
+    
+    // Search by Email
+    if (order.userEmail?.toLowerCase().includes(searchLower)) return true;
+    
+    // Search by Date (various formats)
+    const orderDate = new Date(order.createdAt);
+    const dateString = orderDate.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    }).toLowerCase();
+    const shortDate = orderDate.toLocaleDateString('en-US').toLowerCase();
+    if (dateString.includes(searchLower) || shortDate.includes(searchLower)) return true;
+    
+    // Search by Status
+    const statusMap = {
+      'placed': ['placed', 'new', 'pending'],
+      'in_kitchen': ['kitchen', 'cooking', 'preparing'],
+      'on_the_way': ['way', 'delivery', 'delivering', 'transit'],
+      'delivered': ['delivered', 'complete', 'completed'],
+      'cancelled': ['cancelled', 'canceled', 'cancel'],
+    };
+    
+    for (const [status, keywords] of Object.entries(statusMap)) {
+      if (order.status === status && keywords.some(keyword => keyword.includes(searchLower))) {
+        return true;
+      }
+    }
+    
+    // Search by Items/Products
+    if (order.cartProducts && Array.isArray(order.cartProducts)) {
+      const hasMatchingItem = order.cartProducts.some(item => {
+        if (item.name?.toLowerCase().includes(searchLower)) return true;
+        if (item.size?.name?.toLowerCase().includes(searchLower)) return true;
+        
+        if (item.extras && Array.isArray(item.extras)) {
+          return item.extras.some(extra => 
+            extra.name?.toLowerCase().includes(searchLower)
+          );
+        }
+        
+        return false;
+      });
+      
+      if (hasMatchingItem) return true;
+    }
+    
+    return false;
   });
 
   if (orders.length === 0) {
@@ -469,17 +557,33 @@ export default function OrderViewsDemo({ orders = [], onOrderUpdate }) {
 
   return (
     <div style={{ padding: 16, display: 'grid', gap: 12 }}>
-      {isAdmin && (
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Enter order ID or phone"
-            style={{
-              padding: '10px 12px', borderRadius: 12, border: '1px solid #e5e7eb',
-              outline: 'none', minWidth: 240,
-            }}
-          />
+      {/* Search bar - shown for EVERYONE (admins and users) */}
+      <div style={{
+        display: 'flex',
+        gap: 8,
+        alignItems: 'center',
+        flexWrap: 'wrap',
+        padding: 16,
+        background: '#f8fafc',
+        borderRadius: 16,
+        border: '1px solid #e5e7eb',
+      }}>
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search by ID, date, items, status..."
+          style={{
+            flex: 1,
+            minWidth: 280,
+            padding: '10px 12px',
+            border: '1px solid #cbd5e1',
+            borderRadius: 12,
+            outline: 'none',
+            fontSize: 14,
+          }}
+        />
+        {/* Admin view toggle - only shown for admins */}
+        {isAdmin && (
           <div style={{ display: 'flex', gap: 8 }}>
             <Button variant={role === 'customer' ? 'solid' : 'outline'} onClick={() => setRole('customer')}>
               Customer view
@@ -488,9 +592,17 @@ export default function OrderViewsDemo({ orders = [], onOrderUpdate }) {
               Admin view
             </Button>
           </div>
+        )}
+      </div>
+
+      {/* Results counter */}
+      {search && (
+        <div style={{ fontSize: 13, color: '#64748b', paddingLeft: 4 }}>
+          Found {filteredOrders.length} order{filteredOrders.length !== 1 ? 's' : ''}
         </div>
       )}
 
+      {/* Orders list */}
       {filteredOrders.map((order) => (
         <OrderCard 
           key={order._id} 
