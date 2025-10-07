@@ -165,7 +165,7 @@ export default function OrdersIndexPage() {
       {/* Results count */}
       {search && (
         <div className="mt-4 text-sm text-slate-600">
-          Found {filteredOrders.length} order{filteredOrders.length !== 1 ? 's' : ''} matching "{search}"
+          Found {filteredOrders.length} order{filteredOrders.length !== 1 ? 's' : ''} matching &quot;{search}&quot;
         </div>
       )}
 
@@ -175,7 +175,7 @@ export default function OrdersIndexPage() {
           <div className="text-center py-12 bg-slate-50 rounded-xl">
             {search ? (
               <>
-                <p className="text-slate-600 mb-2">No orders found matching "{search}"</p>
+                <p className="text-slate-600 mb-2">No orders found matching &quot;{search}&quot;</p>
                 <p className="text-sm text-slate-500">
                   Try searching by order ID, item name, status, or date
                 </p>
