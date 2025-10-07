@@ -8,41 +8,35 @@ export default function Hero() {
           Everything <br />
           is better <br />
           with a&nbsp;
-          <span className="text-primary">Pizza</span>
+          <span style={{color:'#493628'}}>PINAGPALA</span>
         </h1>
 
-        <p className="my-6 text-gray-500 text-sm">
-          <q>
-            Neque porro quisquam est qui dolorem ipsum quia dolor sit amet,
-            consectetur, adipisci velit...
-          </q>{" "}
-          <q>
-            There is no one who loves pain itself, who seeks after it and wants
-            to have it, simply because it is pain...
-          </q>
-        </p>
+        
 
-        <div className="flex gap-4 text-sm">
+        <div className="flex gap-4 text-sm" style={{color:'white', marginTop:'20px'}}>
           <button
             type="button"
-            className="flex items-center gap-2 px-8 py-2 rounded-full bg-primary text-white uppercase"
+            className="flex items-center gap-2 px-8 py-2 rounded-full bg-primary text-white uppercase cursor-pointer"
+           
           >
-            Order now
+            <a href="/menu" className="flex items-center gap-2"  style={{display:'flex',color:'white'}}>
+              Order now
             <Right />
+            </a>
           </button>
           <button
             type="button"
-            className="flex items-center gap-2 py-2 font-semibold text-gray-600"
+            
           >
+            <a href="#about" className="cursor-pointer flex items-center gap-2 py-2 font-semibold text-gray-600" style={{display:'flex',color:'black'}}>
             Learn more
             <Right />
+            </a>
           </button>
         </div>
       </div>
 
-      <div className="relative">
-        <img src="/pizza.png" alt="Slice of pizza" />
-      </div>
+      
     </section>
   );
 }

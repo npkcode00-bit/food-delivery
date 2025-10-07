@@ -15,13 +15,14 @@ function AuthLinks({ status, userName }) {
     return (
       <>
         {userName && (
-          <Link href="/profile" className="whitespace-nowrap">
+          <div className="whitespace-nowrap">
             Hello, {userName}
-          </Link>
+          </div>
         )}
         <button
           onClick={() => signOut()}
           className="bg-primary rounded-full text-white px-8 py-2 cursor-pointer"
+          style={{color:'white'}}
         >
           Logout
         </button>
@@ -31,8 +32,8 @@ function AuthLinks({ status, userName }) {
 
   return (
     <>
-      <Link href="/login">Login</Link>
-      <Link href="/register" className="bg-primary rounded-full text-white px-8 py-2">
+      <Link  style={{color:'#AB886D', backgroundColor:'transparent',border:'2px solid #AB886D'}}  className="rounded-full px-8 py-2"  href="/login">Login</Link>
+      <Link  style={{color:'white'}} href="/register" className="bg-primary rounded-full text-white px-8 py-2">
         Register
       </Link>
     </>

@@ -49,11 +49,13 @@ export default function NewMenuItemPage() {
   return (
     <section className="mt-8">
       <UserTabs isAdmin={isAdmin} />
-      <div className="max-w-2xl mx-auto mt-8">
-        <Link href="/menu-items" className="button">
-          <Left />
+     <div className="max-w-2xl mx-auto mt-8">
+         <button className='bg-primary' style={{maxWidth:'250px'}}>
+        <Link style={{color:'white'}} href="/menu-items" className="button flex gap-2">
+          <Left style={{color:'white'}} />
           <span>Show all menu items</span>
         </Link>
+        </button>
       </div>
       <MenuItemForm menuItem={null} onSubmit={handleFormSubmit} />
     </section>

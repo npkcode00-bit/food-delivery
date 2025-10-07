@@ -1,11 +1,14 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
+import { CartContext } from '../components/AppContext';
 import OrderViewsDemo from '../components/layout/OrderViewsDemo';
+import toast from 'react-hot-toast';
 
 export default function OrdersPage() {
   const { data: session, status } = useSession();
+  const { clearCart } = useContext(CartContext);
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -22,13 +25,23 @@ export default function OrdersPage() {
   };
 
   useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const url = window.location.href;
+      if (url.includes('clear-cart=1') || url.includes('success=1')) {
+        clearCart();
+        toast.success('Payment successful! Thank you for your order.');
+        // Clean up the URL
+        window.history.replaceState({}, '', window.location.pathname);
+      }
+    }
+  }, [clearCart]);
+
+  useEffect(() => {
     if (status === 'authenticated') {
       fetchOrders();
       
-      // Poll for updates every 5 seconds
       const interval = setInterval(fetchOrders, 5000);
       
-      // Cleanup interval on unmount
       return () => clearInterval(interval);
     }
   }, [status]);

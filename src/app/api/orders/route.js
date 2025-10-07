@@ -42,3 +42,33 @@ export async function PATCH(req) {
   
   return Response.json({ ok: true, status });
 }
+
+export async function DELETE(req) {
+  mongoose.connect(process.env.MONGO_URL);
+  
+  const session = await getServerSession(authOptions);
+  const isAdmin = session?.user?.admin;
+
+  if (!isAdmin) {
+    return Response.json({ error: 'Unauthorized' }, { status: 403 });
+  }
+
+  const { searchParams } = new URL(req.url);
+  const _id = searchParams.get('_id');
+  
+  if (!_id) {
+    return Response.json({ error: 'Order ID is required' }, { status: 400 });
+  }
+
+  try {
+    const result = await Order.deleteOne({ _id });
+    
+    if (result.deletedCount === 0) {
+      return Response.json({ error: 'Order not found' }, { status: 404 });
+    }
+    
+    return Response.json({ success: true });
+  } catch (error) {
+    return Response.json({ error: 'Failed to delete order' }, { status: 500 });
+  }
+}

@@ -19,9 +19,7 @@ export function cartProductPrice(cartProduct) {
   return price;
 }
 
-// --- Public wrapper you use in layout ---
 export function AppProvider({ children }) {
-  // IMPORTANT: SessionProvider must wrap the component that calls useSession()
   return (
     <SessionProvider>
       <CartProviderInner>{children}</CartProviderInner>
@@ -29,7 +27,6 @@ export function AppProvider({ children }) {
   );
 }
 
-// --- Actual provider that reads the session and manages the cart ---
 function CartProviderInner({ children }) {
   const { data: session, status } = useSession();
   const userId = session?.user?.id || 'guest';
@@ -39,10 +36,35 @@ function CartProviderInner({ children }) {
   const [cartProducts, setCartProducts] = useState([]);
   const ls = typeof window !== 'undefined' ? window.localStorage : null;
 
-  // Avoid merging multiple times on a single login
   const mergedOnceRef = useRef(false);
 
-  // One-time migration: if you used to store under 'cart', move it to guest
+  // IMMEDIATE clear on mount if success/clear-cart param exists
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const url = window.location.href;
+    if (url.includes('clear-cart=1') || url.includes('success=1')) {
+      // Clear ALL possible cart keys immediately
+      if (ls) {
+        const allKeys = Object.keys(ls);
+        allKeys.forEach(key => {
+          if (key.startsWith('cart')) {
+            ls.removeItem(key);
+          }
+        });
+      }
+      
+      // Set empty cart
+      setCartProducts([]);
+      
+      // Show toast
+      toast.success('Payment successful! Thank you for your order.');
+      
+      // Clean URL
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }, []); // Run only once on mount
+
   useEffect(() => {
     if (!ls) return;
     const legacy = ls.getItem('cart');
@@ -52,11 +74,9 @@ function CartProviderInner({ children }) {
     }
   }, [ls]);
 
-  // Load the correct cart whenever the user/session changes
   useEffect(() => {
     if (!ls) return;
 
-    // On first authenticated session, optionally merge guest cart → user cart
     if (status === 'authenticated' && !mergedOnceRef.current) {
       try {
         const guestRaw = ls.getItem(GUEST_KEY);
@@ -70,7 +90,7 @@ function CartProviderInner({ children }) {
           ls.removeItem(GUEST_KEY);
           setCartProducts(guestCart);
           mergedOnceRef.current = true;
-          return; // we've set state already
+          return;
         }
       } catch {
         // ignore parse errors
@@ -79,7 +99,6 @@ function CartProviderInner({ children }) {
       }
     }
 
-    // Load cart for current user (guest or authenticated)
     try {
       const raw = ls.getItem(STORAGE_KEY);
       setCartProducts(raw ? JSON.parse(raw) : []);
@@ -114,7 +133,9 @@ function CartProviderInner({ children }) {
 
   function clearCart() {
     setCartProducts([]);
-    saveCartProductsToLocalStorage([]);
+    if (ls) {
+      ls.removeItem(STORAGE_KEY);
+    }
   }
 
   return (

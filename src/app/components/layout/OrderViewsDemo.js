@@ -2,6 +2,7 @@
 
 import React, { useMemo, useState } from 'react';
 import { useSession } from 'next-auth/react';
+import toast from 'react-hot-toast';
 
 // -------------------- Constants & helpers --------------------
 
@@ -35,9 +36,26 @@ async function updateOrderStatus(orderId, next) {
   }
 }
 
+async function deleteOrder(orderId) {
+  try {
+    const response = await fetch(`/api/orders?_id=${orderId}`, {
+      method: 'DELETE',
+    });
+    
+    if (!response.ok) {
+      const data = await response.json();
+      throw new Error(data.error || 'Failed to delete order');
+    }
+
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: error.message };
+  }
+}
+
 // -------------------- Tiny UI primitives --------------------
 
-function Button({ children, variant = 'solid', onClick, disabled, small }) {
+function Button({ children, variant = 'solid', onClick, disabled, small, style = {} }) {
   const base = {
     padding: small ? '6px 10px' : '10px 14px',
     borderRadius: 12,
@@ -48,6 +66,7 @@ function Button({ children, variant = 'solid', onClick, disabled, small }) {
     background: '#111',
     color: '#fff',
     borderColor: '#111',
+    ...style,
   };
   if (variant === 'outline') {
     base.background = '#fff';
@@ -112,7 +131,7 @@ function Modal({ open, onClose, title, children }) {
       <div style={{ background: '#fff', borderRadius: 16, width: 'min(640px, 92vw)', overflow: 'hidden' }}>
         <div style={{ padding: 16, borderBottom: '1px solid #eee', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <h3 style={{ margin: 0, fontSize: 18 }}>{title}</h3>
-          <button onClick={onClose} style={{ background: 'transparent', border: 0, fontSize: 20, cursor: 'pointer' }}>×</button>
+          <button onClick={onClose} style={{ background: 'transparent', border: 0, fontSize: 20, cursor: 'pointer', maxWidth:'30px' }}>×</button>
         </div>
         <div style={{ padding: 16, maxHeight: '70vh', overflow: 'auto' }}>{children}</div>
       </div>
@@ -262,7 +281,7 @@ function OrderDetails({ order }) {
   );
 }
 
-function AdminActions({ order, onChange, onRefresh }) {
+function AdminActions({ order, onChange, onRefresh, onDelete }) {
   const [loading, setLoading] = useState(null);
   const canKitchen = order.status === 'placed';
   const canOnTheWay = order.status === 'in_kitchen';
@@ -274,12 +293,72 @@ function AdminActions({ order, onChange, onRefresh }) {
     setLoading(null);
     if (res.ok) {
       onChange(res.status);
-      // Trigger refresh to get latest data for all orders
       if (onRefresh) onRefresh();
     } else {
       window.alert(res.error || 'Failed to update order');
     }
   };
+
+ const handleDelete = async () => {
+  const orderId = order._id?.slice(-6).toUpperCase() || order.id;
+  
+  // Create a custom toast with confirmation buttons
+  toast((t) => (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      <div>
+        Are you sure you want to delete order #{orderId}? This action cannot be undone.
+      </div>
+      <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+        <button
+          onClick={() => toast.dismiss(t.id)}
+          style={{
+            padding: '6px 12px',
+            borderRadius: 8,
+            border: '1px solid #e5e7eb',
+            background: '#fff',
+            cursor: 'pointer',
+            fontWeight: 600,
+          }}
+        >
+          Cancel
+        </button>
+        <button
+          onClick={async () => {
+            toast.dismiss(t.id);
+            
+            setLoading('delete');
+            const res = await deleteOrder(order._id);
+            setLoading(null);
+            
+            if (res.ok) {
+              toast.success('Order deleted successfully');
+              if (onDelete) onDelete(order._id);
+              if (onRefresh) onRefresh();
+            } else {
+              toast.error(res.error || 'Failed to delete order');
+            }
+          }}
+          style={{
+            padding: '6px 12px',
+            borderRadius: 8,
+            border: '1px solid #991b1b',
+            background: '#991b1b',
+            color: '#fff',
+            cursor: 'pointer',
+            fontWeight: 600,
+          }}
+        >
+          Delete
+        </button>
+      </div>
+    </div>
+  ), {
+    duration: 10000,
+    style: {
+      minWidth: '350px',
+    },
+  });
+};
 
   return (
     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -292,13 +371,26 @@ function AdminActions({ order, onChange, onRefresh }) {
       <Button variant="ghost" disabled={!canDeliver || !!loading} onClick={() => go('delivered')}>
         {loading === 'delivered' ? 'Updating…' : 'Mark delivered'}
       </Button>
+      <Button 
+        variant="outline" 
+        disabled={!!loading} 
+        onClick={handleDelete}
+        style={{ 
+          marginLeft: 'auto', 
+          background: '#fee2e2', 
+          color: '#991b1b', 
+          borderColor: '#fca5a5' 
+        }}
+      >
+        {loading === 'delete' ? 'Deleting…' : 'Delete'}
+      </Button>
     </div>
   );
 }
 
 // -------------------- Main Card --------------------
 
-function OrderCard({ initialOrder, role, onRefresh }) {
+function OrderCard({ initialOrder, role, onRefresh, onDelete }) {
   const [order, setOrder] = useState(initialOrder);
   const [open, setOpen] = useState(false);
 
@@ -330,6 +422,7 @@ function OrderCard({ initialOrder, role, onRefresh }) {
             order={order} 
             onChange={(next) => setOrder((o) => ({ ...o, status: next }))} 
             onRefresh={onRefresh}
+            onDelete={onDelete}
           />
         )}
       </div>
@@ -404,6 +497,7 @@ export default function OrderViewsDemo({ orders = [], onOrderUpdate }) {
           initialOrder={order} 
           role={isAdmin ? role : 'customer'} 
           onRefresh={onOrderUpdate}
+          onDelete={() => onOrderUpdate()}
         />
       ))}
     </div>

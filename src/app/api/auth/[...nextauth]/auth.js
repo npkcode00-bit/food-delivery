@@ -1,10 +1,7 @@
 import mongoose from 'mongoose';
-import NextAuth from 'next-auth';
 import CredentialsProvider from 'next-auth/providers/credentials';
 import bcrypt from 'bcrypt';
 import { User } from '../../../models/User';
-
-export const runtime = 'nodejs';
 
 async function dbConnect() {
   if (mongoose.connection.readyState >= 1) return;
@@ -15,7 +12,6 @@ export const authOptions = {
   secret: process.env.NEXTAUTH_SECRET ?? process.env.SECRET,
   session: { strategy: 'jwt' },
 
-  // Optional: keep UX on your custom pages
   pages: {
     signIn: '/login',
     error: '/login',
@@ -67,6 +63,3 @@ export const authOptions = {
     },
   },
 };
-
-const handler = NextAuth(authOptions);
-export { handler as GET, handler as POST };

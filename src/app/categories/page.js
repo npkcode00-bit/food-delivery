@@ -30,37 +30,43 @@ export default function CategoriesPage() {
       })
   }
 
-  async function handleCategorySubmit(ev) {
-    ev.preventDefault()
+ async function handleCategorySubmit(ev) {
+  ev.preventDefault()
 
-    const creationPromise = new Promise(async (resolve, reject) => {
-      try {
-        const data = { name: categoryName }
-        if (editedCategory) data._id = editedCategory._id
-
-        const response = await fetch('/api/categories', {
-          method: editedCategory ? 'PUT' : 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(data),
-        })
-
-        if (!response.ok) throw new Error('Request failed')
-
-        setCategoryName('')
-        setEditedCategory(null)
-        fetchCategories()
-        resolve()
-      } catch {
-        reject()
-      }
-    })
-
-    await toast.promise(creationPromise, {
-      loading: editedCategory ? 'Updating category...' : 'Creating your new category...',
-      success: editedCategory ? 'Category updated' : 'Category created',
-      error: 'Error, sorry...',
-    })
+  // Validation: Check if category name is empty or just whitespace
+  if (!categoryName || categoryName.trim() === '') {
+    toast.error('Category name cannot be empty')
+    return
   }
+
+  const creationPromise = new Promise(async (resolve, reject) => {
+    try {
+      const data = { name: categoryName.trim() } // Also trim whitespace
+      if (editedCategory) data._id = editedCategory._id
+
+      const response = await fetch('/api/categories', {
+        method: editedCategory ? 'PUT' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      })
+
+      if (!response.ok) throw new Error('Request failed')
+
+      setCategoryName('')
+      setEditedCategory(null)
+      fetchCategories()
+      resolve()
+    } catch {
+      reject()
+    }
+  })
+
+  await toast.promise(creationPromise, {
+    loading: editedCategory ? 'Updating category...' : 'Creating your new category...',
+    success: editedCategory ? 'Category updated' : 'Category created',
+    error: 'Error, sorry...',
+  })
+}
 
   async function handleDeleteClick(_id) {
     const promise = new Promise(async (resolve, reject) => {

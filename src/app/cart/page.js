@@ -9,7 +9,7 @@ import SectionHeaders from '../components/layout/SectionHeaders';
 import CartProduct from '../components/menu/CartProduct';
 
 export default function CartPage() {
-  const { cartProducts, removeCartProduct } = useContext(CartContext);
+  const { cartProducts, removeCartProduct, clearCart } = useContext(CartContext);
 
   const [address, setAddress] = useState({
     phone: '',
@@ -20,10 +20,18 @@ export default function CartPage() {
   });
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.location.href.includes('canceled=1')) {
+  if (typeof window !== 'undefined') {
+    const url = window.location.href;
+    if (url.includes('canceled=1')) {
       toast.error('Payment failed 😔');
     }
-  }, []);
+    if (url.includes('clear-cart=1') || url.includes('success=1')) {
+      clearCart();
+      toast.success('Payment successful! Thank you for your order.');
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }
+}, [clearCart]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -52,6 +60,28 @@ export default function CartPage() {
   async function proceedToCheckout(ev) {
     ev.preventDefault();
 
+    // Validation
+    if (!address.phone || address.phone.trim() === '') {
+      toast.error('Phone number is required');
+      return;
+    }
+    if (!address.streetAddress || address.streetAddress.trim() === '') {
+      toast.error('Street address is required');
+      return;
+    }
+    if (!address.city || address.city.trim() === '') {
+      toast.error('City is required');
+      return;
+    }
+    if (!address.postalCode || address.postalCode.trim() === '') {
+      toast.error('Postal code is required');
+      return;
+    }
+    if (!address.country || address.country.trim() === '') {
+      toast.error('Country is required');
+      return;
+    }
+
     const promise = new Promise((resolve, reject) => {
       fetch('/api/checkout', {
         method: 'POST',
@@ -60,8 +90,8 @@ export default function CartPage() {
       })
         .then(async (response) => {
           if (response.ok) {
-            resolve();
             const url = await response.json();
+            resolve();
             window.location = url;
           } else {
             reject();
@@ -96,12 +126,7 @@ export default function CartPage() {
         <div>
           {cartProducts.map((product, index) => (
             <CartProduct
-              key={
-                product._id ||
-                `${product.name}-${product.size?.name || 'base'}-${JSON.stringify(
-                  product.extras || []
-                )}-${index}`
-              }
+              key={index}
               product={product}
               onRemove={() => removeCartProduct(index)}
             />

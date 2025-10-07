@@ -35,10 +35,12 @@ export default function MenuItemsPage() {
       <UserTabs isAdmin={isAdmin} />
 
       <div className="mt-8">
-        <Link className="button flex" href="/menu-items/new">
-          <span>Create new menu item</span>
-          <Right />
+        <button className='bg-primary' style={{maxWidth:'250px'}}>
+        <Link className="button flex gap-2" href="/menu-items/new" >
+          <span style={{color:'white'}}>Create new menu item</span>
+          <Right style={{color:'white'}} />
         </Link>
+        </button>
       </div>
 
       <div>
