@@ -8,32 +8,39 @@ import { CartContext } from '../AppContext';
 import Bars2 from '../icons/Bars2';
 import ShoppingCart from '../icons/ShoppingCart';
 
-function AuthLinks({ status, userName }) {
+function AuthLinks({ status, userFirstName, userName }) {
   if (status === 'loading') return null;
 
   if (status === 'authenticated') {
+    const greeting = userFirstName || userName || '';
     return (
-      <>
-        {userName && (
-          <div className="whitespace-nowrap">
-            Hello, {userName}
-          </div>
+      <div className="flex items-center gap-3">
+        {greeting && (
+          <Link href="/profile" className="whitespace-nowrap underline">
+            Hello, {greeting}
+          </Link>
         )}
         <button
           onClick={() => signOut()}
           className="bg-primary rounded-full text-white px-8 py-2 cursor-pointer"
-          style={{color:'white'}}
+          style={{ color: 'white' }}
         >
           Logout
         </button>
-      </>
+      </div>
     );
   }
 
   return (
     <>
-      <Link  style={{color:'#AB886D', backgroundColor:'transparent',border:'2px solid #AB886D'}}  className="rounded-full px-8 py-2"  href="/login">Login</Link>
-      <Link  style={{color:'white'}} href="/register" className="bg-primary rounded-full text-white px-8 py-2">
+      <Link
+        style={{ color: '#AB886D', backgroundColor: 'transparent', border: '2px solid #AB886D' }}
+        className="rounded-full px-8 py-2"
+        href="/login"
+      >
+        Login
+      </Link>
+      <Link style={{ color: 'white' }} href="/register" className="bg-primary rounded-full text-white px-8 py-2">
         Register
       </Link>
     </>
@@ -55,10 +62,17 @@ function CartLink({ count }) {
 
 export default function Header() {
   const { data: session, status } = useSession();
-  const user = session?.user;
-  const isAdmin = !!user?.admin;
+  const user = session?.user || {};
   const isAuthed = status === 'authenticated';
 
+  const role = user?.role; // 'customer' | 'admin' | 'accounting' | 'cashier' | undefined
+  const isAdmin = user?.admin === true || role === 'admin'; // legacy flag supported
+  const isCustomer = role === 'customer';
+
+  // HOME visibility rule: show if NOT authenticated OR role === 'customer'
+  const showHome = !isAuthed || isCustomer;
+
+  const userFirstName = user?.firstName || '';
   let userName = user?.name || user?.email || '';
   if (userName.includes(' ')) userName = userName.split(' ')[0];
 
@@ -67,17 +81,14 @@ export default function Header() {
 
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
-  const brandTitle = 'ST PIZZA';
-
   return (
     <header>
       {/* Mobile header */}
       <div className="flex items-center md:hidden justify-between">
-        <Link className="text-primary font-semibold text-2xl" href="/">
-          {brandTitle}
-        </Link>
+        <img src="/logo.png" alt="Logo" style={{ width: '300px' }} />
         <div className="flex gap-8 items-center">
-          {isAuthed && <CartLink count={cartCount} />}
+          {/* Cart only for authenticated customers */}
+          {isAuthed && isCustomer && <CartLink count={cartCount} />}
           <button
             className="p-1 border"
             onClick={() => setMobileNavOpen((prev) => !prev)}
@@ -94,33 +105,55 @@ export default function Header() {
           onClick={() => setMobileNavOpen(false)}
           className="md:hidden p-4 bg-gray-200 rounded-lg mt-2 flex flex-col gap-2 text-center"
         >
-          <Link href="/">Home</Link>
-          <Link href="/menu">Menu</Link>
-          <Link href="/#about">About</Link>
-          <Link href="/#contact">Contact</Link>
+          {/* Home visible to guests and customers; hidden from admin/accounting/cashier */}
+          {showHome && <Link href="/">Home</Link>}
+
+           {/* show Menu only when user.role is NOT cashier */}
+     
+   {user?.role !== 'accounting' && (
+  <Link href="/menu">Menu</Link>
+)}
+
+      {/* other nav items */}
+
+          {/* Orders visible to any authenticated user */}
           {isAuthed && <Link href="/orders">Orders</Link>}
-          {isAdmin && <Link href="/admin">Admin</Link>}
-          <AuthLinks status={status} userName={userName} />
+
+          {/* Admin links */}
+          {isAdmin && <Link href="/admin" className="mr-2">Items</Link>}
+          {isAdmin && <Link href="/users" className="mr-2">Users</Link>}
+
+          <AuthLinks status={status} userFirstName={userFirstName} userName={userFirstName || userName} />
         </div>
       )}
 
       {/* Desktop header */}
       <div className="hidden md:flex items-center justify-between">
         <nav className="flex items-center gap-8 text-gray-500 font-semibold">
-          <Link className="text-primary font-semibold text-2xl" href="/">
-            {brandTitle}
-          </Link>
-          <Link href="/">Home</Link>
-          <Link href="/menu">Menu</Link>
-          <Link href="/#about">About</Link>
-          <Link href="/#contact">Contact</Link>
-          {isAuthed && <Link href="/orders" className='mr-2'>Orders</Link>}
-          {isAdmin && <Link href="/admin">Admin</Link>}
+          <img src="/logo.png" alt="Logo" style={{ width: '300px' }} />
+
+          {/* Home visible to guests and customers; hidden from admin/accounting/cashier */}
+          {showHome && <Link href="/">Home</Link>}
+
+          {/* Orders visible to any authenticated user */}
+          {isAuthed && <Link href="/orders" className="mr-2">Orders</Link>}
+
+          {/* Admin links */}
+          {isAdmin && <Link href="/admin">Items</Link>}
+          {isAdmin && <Link href="/users">Users</Link>}
+
+           {/* show Menu only when user.role is NOT cashier */}
+    {user?.role !== 'accounting' && (
+  <Link href="/menu">Menu</Link>
+)}
+
+      {/* other nav items */}
         </nav>
 
         <nav className="flex items-center gap-4 text-gray-500 font-semibold">
-          <AuthLinks status={status} userName={userName} />
-          {isAuthed && <CartLink count={cartCount} />}
+          <AuthLinks status={status} userFirstName={userFirstName} userName={userFirstName || userName} />
+          {/* Cart only for authenticated customers */}
+          {isAuthed && isCustomer && <CartLink count={cartCount} />}
         </nav>
       </div>
     </header>

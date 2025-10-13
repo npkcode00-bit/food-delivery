@@ -39,7 +39,7 @@ export default function CartProduct({ product, onRemove }) {
         )}
       </div>
 
-      <div className="text-lg font-semibold whitespace-nowrap">${total}</div>
+      <div className="text-lg font-semibold whitespace-nowrap">₱{total}</div>
 
       <div className="ml-2">
         <button

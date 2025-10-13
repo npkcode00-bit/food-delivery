@@ -1,99 +1,110 @@
 'use client';
 
-import Link from 'next/link';
 import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import toast from 'react-hot-toast';
 
 export default function RegisterPage() {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
-  const [creatingUser, setCreatingUser] = useState(false);
-  const [userCreated, setUserCreated] = useState(false);
-  const [error, setError] = useState('');
+  const router = useRouter();
+  const [form, setForm] = useState({
+    email: '',
+    password: '',
+    firstName: '',
+    lastName: '',
+    address: '',
+    phone: '',
+  });
+  const [loading, setLoading] = useState(false);
 
-  async function handleFormSubmit(ev) {
-    ev.preventDefault();
-    if (!email || !password) {
-      setError('Email and password are required.');
-      return;
-    }
-    if (password.length < 5) {
-      setError('Password must be at least 5 characters.');
-      return;
-    }
+  function update(key, value) {
+    setForm((s) => ({ ...s, [key]: value }));
+  }
 
-    setCreatingUser(true);
-    setError('');
-
+  async function onSubmit(e) {
+    e.preventDefault();
+    setLoading(true);
     try {
       const res = await fetch('/api/register', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(form),
       });
-
-      const data = await res.json().catch(() => ({}));
+      const data = await res.json();
       if (!res.ok) {
-        setError(data?.message || 'Registration failed.');
-      } else {
-        setUserCreated(true);
+        toast.error(data?.message || 'Registration failed.');
+        return;
       }
-    } catch {
-      setError('Network error. Please try again.');
+      toast.success('Account created! Please log in.');
+      router.push('/login');
+    } catch (err) {
+      console.error(err);
+      toast.error('Something went wrong.');
     } finally {
-      setCreatingUser(false);
+      setLoading(false);
     }
   }
 
-  const canSubmit = !creatingUser && email && password.length >= 5;
-
   return (
-    <section>
-      <h1 className="text-center text-primary text-4xl mt-8 mb-4">Register</h1>
-
-      {userCreated && (
-        <div className="my-4 text-center">
-          User created! <br />
-          Now you can{' '}
-          <Link className="underline" href="/login">
-            Login &raquo;
-          </Link>
-        </div>
-      )}
-
-      {error && <div className="my-4 text-center text-red-500">{error}</div>}
-
-      <form className="block max-w-xs mx-auto" onSubmit={handleFormSubmit}>
+    <div className="max-w-md mx-auto my-10">
+      <h1 className="text-2xl font-semibold mb-6">Create an account</h1>
+      <form onSubmit={onSubmit} className="flex flex-col gap-4">
         <input
-          type="email"
-          placeholder="email"
-          disabled={creatingUser}
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          className="mb-2 w-full border p-2 rounded"
+          className="border rounded-md p-3"
+          type="text"
+          placeholder="First name"
+          value={form.firstName}
+          onChange={(e) => update('firstName', e.target.value)}
+          required
         />
         <input
+          className="border rounded-md p-3"
+          type="text"
+          placeholder="Last name"
+          value={form.lastName}
+          onChange={(e) => update('lastName', e.target.value)}
+          required
+        />
+        <input
+          className="border rounded-md p-3"
+          type="text"
+          placeholder="Address"
+          value={form.address}
+          onChange={(e) => update('address', e.target.value)}
+          required
+        />
+        <input
+          className="border rounded-md p-3"
+          type="tel"
+          placeholder="Phone"
+          value={form.phone}
+          onChange={(e) => update('phone', e.target.value)}
+          required
+        />
+        <input
+          className="border rounded-md p-3"
+          type="email"
+          placeholder="Email"
+          value={form.email}
+          onChange={(e) => update('email', e.target.value)}
+          required
+        />
+        <input
+          className="border rounded-md p-3"
           type="password"
-          placeholder="password"
-          disabled={creatingUser}
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          className="mb-4 w-full border p-2 rounded"
+          placeholder="Password (min 5 chars)"
+          value={form.password}
+          onChange={(e) => update('password', e.target.value)}
+          required
+          minLength={5}
         />
         <button
+          className="bg-primary text-white rounded-md p-3 disabled:opacity-60"
+          disabled={loading}
           type="submit"
-          disabled={!canSubmit}
-          className="w-full bg-blue-600 text-white p-2 rounded disabled:opacity-50"
         >
-          {creatingUser ? 'Creating…' : 'Register'}
+          {loading ? 'Creating...' : 'Create account'}
         </button>
-
-        <div className="text-center my-4 text-gray-500">
-          Existing account?
-          <Link className="underline ml-1" href="/login">
-            Login here
-          </Link>
-        </div>
       </form>
-    </section>
+    </div>
   );
 }

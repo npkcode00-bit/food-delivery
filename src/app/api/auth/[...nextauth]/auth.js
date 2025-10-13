@@ -31,6 +31,8 @@ export const authOptions = {
         if (!email || !password) return null;
 
         await dbConnect();
+
+        // Use lean for speed; contains role and admin
         const user = await User.findOne({ email }).lean();
         if (!user || !user.password) return null;
 
@@ -41,6 +43,11 @@ export const authOptions = {
           id: user._id.toString(),
           email: user.email,
           admin: !!user.admin,
+          role: user.role || 'customer',
+          firstName: user.firstName || '',
+          lastName: user.lastName || '',
+          address: user.address || '',
+          phone: user.phone || '',
         };
       },
     }),
@@ -51,6 +58,11 @@ export const authOptions = {
       if (user) {
         token.userId = user.id;
         token.admin = user.admin ?? false;
+        token.role = user.role || 'customer';
+        token.firstName = user.firstName || '';
+        token.lastName = user.lastName || '';
+        token.address = user.address || '';
+        token.phone = user.phone || '';
       }
       return token;
     },
@@ -58,6 +70,15 @@ export const authOptions = {
       if (session.user) {
         session.user.id = token.userId;
         session.user.admin = token.admin ?? false;
+        session.user.role = token.role || 'customer';
+        session.user.firstName = token.firstName || '';
+        session.user.lastName = token.lastName || '';
+        session.user.address = token.address || '';
+        session.user.phone = token.phone || '';
+        session.user.name =
+          (session.user.firstName && session.user.lastName)
+            ? `${session.user.firstName} ${session.user.lastName}`
+            : session.user.name || session.user.email || '';
       }
       return session;
     },

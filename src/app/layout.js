@@ -8,8 +8,8 @@ import {Toaster} from "react-hot-toast";
 const roboto = Roboto({ subsets: ['latin'], weight: ['400', '500', '700'] })
 
 export const metadata = {
-  title: 'ST PIZZA',
-  description: 'Order delicious pizza online',
+  title: 'Pinagpala',
+  description: 'Order delicious food online',
 }
 
 export default function RootLayout({ children }) {

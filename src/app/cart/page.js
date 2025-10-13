@@ -139,9 +139,9 @@ export default function CartPage() {
               Total:
             </div>
             <div className="font-semibold pl-2 text-right">
-              ${subtotal}<br />
-              ${DELIVERY_FEE}<br />
-              ${subtotal + DELIVERY_FEE}
+              ₱{subtotal}<br />
+              ₱{DELIVERY_FEE}<br />
+              ₱{subtotal + DELIVERY_FEE}
             </div>
           </div>
         </div>
@@ -153,7 +153,7 @@ export default function CartPage() {
               addressProps={address}
               setAddressProp={handleAddressChange}
             />
-            <button className='cursor-pointer' type="submit">Pay ${subtotal + DELIVERY_FEE}</button>
+            <button className='cursor-pointer' type="submit">Pay ₱{subtotal + DELIVERY_FEE}</button>
           </form>
         </div>
       </div>
