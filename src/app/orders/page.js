@@ -1,5 +1,6 @@
 'use client';
 
+import { Suspense } from 'react';
 import { useContext, useEffect, useMemo, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useSession } from 'next-auth/react';
@@ -7,7 +8,8 @@ import toast from 'react-hot-toast';
 import { CartContext } from '../components/AppContext';
 import OrderViewsDemo from '../components/layout/OrderViewsDemo';
 
-export default function OrdersPage() {
+// Wrap the main component logic in a separate component
+function OrdersContent() {
   const { status } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -142,4 +144,17 @@ export default function OrdersPage() {
   }
 
   return <OrderViewsDemo orders={orders} onOrderUpdate={fetchOrders} />;
+}
+
+// Main page component - just wraps with Suspense
+export default function OrdersPage() {
+  return (
+    <Suspense fallback={
+      <div style={{ padding: 16, textAlign: 'center' }}>
+        <p>Loading orders...</p>
+      </div>
+    }>
+      <OrdersContent />
+    </Suspense>
+  );
 }
