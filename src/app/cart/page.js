@@ -109,7 +109,7 @@ export default function CartPage() {
 
   if (!cartProducts?.length) {
     return (
-      <section className="mt-8 text-center">
+      <section className="max-w-7xl mx-auto  mt-8 text-center">
         <SectionHeaders mainHeader="Cart" />
         <p className="mt-4">Your shopping cart is empty 😔</p>
       </section>
@@ -117,7 +117,7 @@ export default function CartPage() {
   }
 
   return (
-    <section className="mt-8">
+    <section className="max-w-7xl mx-auto mt-8">
       <div className="text-center">
         <SectionHeaders mainHeader="Cart" />
       </div>

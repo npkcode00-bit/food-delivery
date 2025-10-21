@@ -161,6 +161,7 @@ export default function CategoriesPage() {
                   Edit
                 </button>
                 <DeleteButton label="Delete" onDelete={() => handleDeleteClick(c._id)} />
+                  asds
               </div>
             </div>
           ))}

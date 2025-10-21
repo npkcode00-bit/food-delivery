@@ -55,7 +55,7 @@ function LoginForm() {
   }
 
   return (
-    <section className="mt-8">
+    <section className="max-w-4xl mx-auto mt-8">
       <h1 className="text-center text-primary text-4xl mb-4">Login</h1>
 
       {error && <div className="my-4 text-center text-red-500">{error}</div>}

@@ -8,7 +8,7 @@ export default async function AdminUsersPage() {
   if (!session?.user?.admin) redirect('/');
 
   return (
-    <section className="py-8">
+    <section className="max-w-7xl mx-auto py-8">
       <h1 className="text-2xl font-semibold mb-4">Users</h1>
       <AdminUsersClient />
     </section>

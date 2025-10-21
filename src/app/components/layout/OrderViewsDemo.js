@@ -1,11 +1,10 @@
-'use client'
+'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import toast from 'react-hot-toast';
 
-// -------------------- Constants & helpers --------------------
-
+/* -------------------- Constants & helpers -------------------- */
 const STATUS_FLOW = ['placed', 'in_kitchen', 'on_the_way', 'delivered'];
 const STATUS_META = {
   placed: { label: 'Placed' },
@@ -20,8 +19,7 @@ const fmtTime = (iso) =>
 
 const currency = (n) => new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(n);
 
-// -------------------- API --------------------
-
+/* -------------------- API -------------------- */
 async function updateOrderStatus(orderId, next) {
   try {
     const response = await fetch('/api/orders', {
@@ -38,23 +36,18 @@ async function updateOrderStatus(orderId, next) {
 
 async function deleteOrder(orderId) {
   try {
-    const response = await fetch(`/api/orders?_id=${orderId}`, {
-      method: 'DELETE',
-    });
-    
+    const response = await fetch(`/api/orders?_id=${orderId}`, { method: 'DELETE' });
     if (!response.ok) {
       const data = await response.json();
       throw new Error(data.error || 'Failed to delete order');
     }
-
     return { ok: true };
   } catch (error) {
     return { ok: false, error: error.message };
   }
 }
 
-// -------------------- Tiny UI primitives --------------------
-
+/* -------------------- Tiny UI primitives -------------------- */
 function Button({ children, variant = 'solid', onClick, disabled, small, style = {} }) {
   const base = {
     padding: small ? '6px 10px' : '10px 14px',
@@ -139,8 +132,7 @@ function Modal({ open, onClose, title, children }) {
   );
 }
 
-// -------------------- Feature bits --------------------
-
+/* -------------------- Feature bits -------------------- */
 function StatusChip({ status }) {
   const tone =
     status === 'in_kitchen' ? 'warn' :
@@ -181,40 +173,25 @@ function StatusStepper({ status }) {
 function OrderDetails({ order }) {
   const total = useMemo(() => {
     if (typeof order.totalPrice === 'number') return order.totalPrice;
-    
     if (order.cartProducts && Array.isArray(order.cartProducts)) {
       return order.cartProducts.reduce((sum, item) => {
         let itemPrice = item.basePrice || 0;
-        
-        if (item.size?.price) {
-          itemPrice += item.size.price;
-        }
-        
+        if (item.size?.price) itemPrice += item.size.price;
         if (item.extras && Array.isArray(item.extras)) {
-          item.extras.forEach(extra => {
-            itemPrice += extra.price || 0;
-          });
+          item.extras.forEach(extra => { itemPrice += extra.price || 0; });
         }
-        
         return sum + itemPrice;
       }, 0);
     }
-    
     if (order.items && Array.isArray(order.items)) {
       return order.items.reduce((sum, it) => sum + it.qty * it.price, 0);
     }
-    
     return 0;
   }, [order]);
 
   const deliveryAddress = useMemo(() => {
     if (order.deliveryAddress) return order.deliveryAddress;
-    const parts = [
-      order.streetAddress,
-      order.city,
-      order.postalCode,
-      order.country
-    ].filter(Boolean);
+    const parts = [order.streetAddress, order.city, order.postalCode, order.country].filter(Boolean);
     return parts.length > 0 ? parts.join(', ') : null;
   }, [order]);
 
@@ -222,32 +199,14 @@ function OrderDetails({ order }) {
     if (order.cartProducts && Array.isArray(order.cartProducts)) {
       return order.cartProducts.map((item, index) => {
         let itemPrice = item.basePrice || 0;
-        
-        if (item.size?.price) {
-          itemPrice += item.size.price;
-        }
-        
+        if (item.size?.price) itemPrice += item.size.price;
         if (item.extras && Array.isArray(item.extras)) {
-          item.extras.forEach(extra => {
-            itemPrice += extra.price || 0;
-          });
+          item.extras.forEach(extra => { itemPrice += extra.price || 0; });
         }
-        
         let itemName = item.name || 'Unknown Item';
-        if (item.size?.name) {
-          itemName += ` (${item.size.name})`;
-        }
-        if (item.extras && item.extras.length > 0) {
-          const extrasNames = item.extras.map(e => e.name).join(', ');
-          itemName += ` + ${extrasNames}`;
-        }
-        
-        return {
-          id: item._id || index,
-          name: itemName,
-          qty: 1,
-          price: itemPrice
-        };
+        if (item.size?.name) itemName += ` (${item.size.name})`;
+        if (item.extras?.length) itemName += ` + ${item.extras.map(e => e.name).join(', ')}`;
+        return { id: item._id || index, name: itemName, qty: 1, price: itemPrice };
       });
     }
     return order.items || [];
@@ -314,14 +273,16 @@ function OrderDetails({ order }) {
       {order.notes && (
         <div>
           <div style={{ fontSize: 12, color: '#64748b', marginBottom: 6 }}>Notes</div>
-          <div style={{ padding: 12, border: '1px solid #e5e7eb', borderRadius: 12, background: '#f8fafc' }}>{order.notes}</div>
+          <div style={{ padding: 12, border: '1px solid #e5e7eb', borderRadius: 12, background: '#f8fafc' }}>
+            {order.notes}
+          </div>
         </div>
       )}
     </div>
   );
 }
 
-function AdminActions({ order, onChange, onRefresh, onDelete }) {
+function AdminActions({ order, onChange, onRefresh, onDelete, canDelete }) {
   const [loading, setLoading] = useState(null);
   const canKitchen = order.status === 'placed';
   const canOnTheWay = order.status === 'in_kitchen';
@@ -335,73 +296,45 @@ function AdminActions({ order, onChange, onRefresh, onDelete }) {
       onChange(res.status);
       if (onRefresh) onRefresh();
     } else {
-      window.alert(res.error || 'Failed to update order');
+      toast.error(res.error || 'Failed to update order');
     }
   };
 
   const handleDelete = async () => {
-    const orderId = order._id?.slice(-6).toUpperCase() || order.id;
-    
+    const displayId = order._id?.slice(-6).toUpperCase() || order.id;
     toast((t) => (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <div>
-          Are you sure you want to delete order #{orderId}? This action cannot be undone.
-        </div>
+        <div>Delete order #{displayId}? This cannot be undone.</div>
         <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-          <button
-            onClick={() => toast.dismiss(t.id)}
-            style={{
-              padding: '6px 12px',
-              borderRadius: 8,
-              border: '1px solid #e5e7eb',
-              background: '#fff',
-              cursor: 'pointer',
-              fontWeight: 600,
-            }}
-          >
+          <button onClick={() => toast.dismiss(t.id)} style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#fff', cursor: 'pointer', fontWeight: 600 }}>
             Cancel
           </button>
           <button
             onClick={async () => {
               toast.dismiss(t.id);
-              
               setLoading('delete');
               const res = await deleteOrder(order._id);
               setLoading(null);
-              
               if (res.ok) {
-                toast.success('Order deleted successfully');
-                if (onDelete) onDelete(order._id);
-                if (onRefresh) onRefresh();
+                toast.success('Order deleted');
+                onDelete?.(order._id);
+                onRefresh?.();
               } else {
                 toast.error(res.error || 'Failed to delete order');
               }
             }}
-            style={{
-              padding: '6px 12px',
-              borderRadius: 8,
-              border: '1px solid #991b1b',
-              background: '#991b1b',
-              color: '#fff',
-              cursor: 'pointer',
-              fontWeight: 600,
-            }}
+            style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #991b1b', background: '#991b1b', color: '#fff', cursor: 'pointer', fontWeight: 600 }}
           >
             Delete
           </button>
         </div>
       </div>
-    ), {
-      duration: 10000,
-      style: {
-        minWidth: '350px',
-      },
-    });
+    ), { duration: 10000, style: { minWidth: 350 } });
   };
 
   return (
     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-      <Button disabled={!canKitchen || !!loading} onClick={() => go('in_kitchen')}> 
+      <Button disabled={!canKitchen || !!loading} onClick={() => go('in_kitchen')}>
         {loading === 'in_kitchen' ? 'Updating…' : 'In the kitchen'}
       </Button>
       <Button variant="outline" disabled={!canOnTheWay || !!loading} onClick={() => go('on_the_way')}>
@@ -410,33 +343,25 @@ function AdminActions({ order, onChange, onRefresh, onDelete }) {
       <Button variant="ghost" disabled={!canDeliver || !!loading} onClick={() => go('delivered')}>
         {loading === 'delivered' ? 'Updating…' : 'Mark delivered'}
       </Button>
-      <Button 
-        variant="outline" 
-        disabled={!!loading} 
-        onClick={handleDelete}
-        style={{ 
-          marginLeft: 'auto', 
-          background: '#fee2e2', 
-          color: '#991b1b', 
-          borderColor: '#fca5a5' 
-        }}
-      >
-        {loading === 'delete' ? 'Deleting…' : 'Delete'}
-      </Button>
+
+      {canDelete && (
+        <Button
+          variant="outline"
+          disabled={!!loading}
+          onClick={handleDelete}
+          style={{ marginLeft: 'auto', background: '#fee2e2', color: '#991b1b', borderColor: '#fca5a5' }}
+        >
+          {loading === 'delete' ? 'Deleting…' : 'Delete'}
+        </Button>
+      )}
     </div>
   );
 }
 
-// -------------------- Main Card --------------------
-
-function OrderCard({ initialOrder, role, onRefresh, onDelete }) {
+/* -------------------- Main Card -------------------- */
+function OrderCard({ initialOrder, role, canDelete, onRefresh, onDelete }) {
   const [order, setOrder] = useState(initialOrder);
-  const [open, setOpen] = useState(false);
-
-  useMemo(() => {
-    setOrder(initialOrder);
-  }, [initialOrder]);
-
+  useEffect(() => { setOrder(initialOrder); }, [initialOrder]);
   const displayOrderId = order._id?.slice(-6).toUpperCase() || order.id || 'N/A';
 
   return (
@@ -454,59 +379,75 @@ function OrderCard({ initialOrder, role, onRefresh, onDelete }) {
       </div>
 
       <div style={{ display: 'flex', gap: 10, marginTop: 12, flexWrap: 'wrap' }}>
-        <Button small variant="outline" onClick={() => setOpen(true)}>View details</Button>
+        <Button small variant="outline" onClick={() => window.dispatchEvent(new CustomEvent('open-order-modal-' + order._id))}>
+          View details
+        </Button>
         {role === 'admin' && (
-          <AdminActions 
-            order={order} 
-            onChange={(next) => setOrder((o) => ({ ...o, status: next }))} 
+          <AdminActions
+            order={order}
+            onChange={(next) => setOrder((o) => ({ ...o, status: next }))}
             onRefresh={onRefresh}
             onDelete={onDelete}
+            canDelete={canDelete}
           />
         )}
       </div>
 
-      <Modal open={open} onClose={() => setOpen(false)} title={`Order #${displayOrderId}`}>
-        <OrderDetails order={order} />
-      </Modal>
+      {/* Modal wiring (one per card) */}
+      <ModalWrapper order={order} />
     </Card>
   );
 }
 
-// -------------------- Main Component --------------------
+function ModalWrapper({ order }) {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const handler = (e) => {
+      if (e.type === 'open-order-modal-' + order._id) setOpen(true);
+    };
+    window.addEventListener('open-order-modal-' + order._id, handler);
+    return () => window.removeEventListener('open-order-modal-' + order._id, handler);
+  }, [order._id]);
+  const displayOrderId = order._id?.slice(-6).toUpperCase() || order.id || 'N/A';
+  return (
+    <Modal open={open} onClose={() => setOpen(false)} title={`Order #${displayOrderId}`}>
+      <OrderDetails order={order} />
+    </Modal>
+  );
+}
 
+/* -------------------- Main Component -------------------- */
 export default function OrderViewsDemo({ orders = [], onOrderUpdate }) {
   const { data: session } = useSession();
-  const isAdmin = !!session?.user?.admin;
-  
-  const [role, setRole] = useState('customer');
+
+  const userIsAdmin   = session?.user?.role === 'admin'   || session?.user?.admin === true;
+  const userIsCashier = session?.user?.role === 'cashier' || session?.user?.cashier === true;
+  const userIsStaff   = userIsAdmin || userIsCashier;
+
+  const [role, setRole] = useState('customer'); // UI mode toggle (customer/admin)
   const [search, setSearch] = useState('');
 
   const filteredOrders = orders.filter(order => {
     if (!search) return true;
-    
-    const searchLower = search.toLowerCase().trim();
-    
-    // Search by Order ID
+    const s = search.toLowerCase().trim();
+
+    // ID
     const orderId = order._id?.slice(-6).toUpperCase() || '';
-    if (orderId.includes(searchLower.toUpperCase())) return true;
-    
-    // Search by Phone
+    if (orderId.includes(s.toUpperCase())) return true;
+
+    // Phone
     if (order.phone?.includes(search)) return true;
-    
-    // Search by Email
-    if (order.userEmail?.toLowerCase().includes(searchLower)) return true;
-    
-    // Search by Date (various formats)
-    const orderDate = new Date(order.createdAt);
-    const dateString = orderDate.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    }).toLowerCase();
-    const shortDate = orderDate.toLocaleDateString('en-US').toLowerCase();
-    if (dateString.includes(searchLower) || shortDate.includes(searchLower)) return true;
-    
-    // Search by Status
+
+    // Email
+    if (order.userEmail?.toLowerCase().includes(s)) return true;
+
+    // Date
+    const dt = new Date(order.createdAt);
+    const long = dt.toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' }).toLowerCase();
+    const short = dt.toLocaleDateString('en-US').toLowerCase();
+    if (long.includes(s) || short.includes(s)) return true;
+
+    // Status
     const statusMap = {
       'placed': ['placed', 'new', 'pending'],
       'in_kitchen': ['kitchen', 'cooking', 'preparing'],
@@ -514,31 +455,23 @@ export default function OrderViewsDemo({ orders = [], onOrderUpdate }) {
       'delivered': ['delivered', 'complete', 'completed'],
       'cancelled': ['cancelled', 'canceled', 'cancel'],
     };
-    
-    for (const [status, keywords] of Object.entries(statusMap)) {
-      if (order.status === status && keywords.some(keyword => keyword.includes(searchLower))) {
-        return true;
-      }
+    for (const [st, kws] of Object.entries(statusMap)) {
+      if (order.status === st && kws.some(k => k.includes(s))) return true;
     }
-    
-    // Search by Items/Products
+
+    // Items
     if (order.cartProducts && Array.isArray(order.cartProducts)) {
-      const hasMatchingItem = order.cartProducts.some(item => {
-        if (item.name?.toLowerCase().includes(searchLower)) return true;
-        if (item.size?.name?.toLowerCase().includes(searchLower)) return true;
-        
-        if (item.extras && Array.isArray(item.extras)) {
-          return item.extras.some(extra => 
-            extra.name?.toLowerCase().includes(searchLower)
-          );
+      const match = order.cartProducts.some(item => {
+        if (item.name?.toLowerCase().includes(s)) return true;
+        if (item.size?.name?.toLowerCase().includes(s)) return true;
+        if (Array.isArray(item.extras)) {
+          return item.extras.some(e => e.name?.toLowerCase().includes(s));
         }
-        
         return false;
       });
-      
-      if (hasMatchingItem) return true;
+      if (match) return true;
     }
-    
+
     return false;
   });
 
@@ -556,34 +489,22 @@ export default function OrderViewsDemo({ orders = [], onOrderUpdate }) {
   }
 
   return (
-    <div style={{ padding: 16, display: 'grid', gap: 12 }}>
-      {/* Search bar - shown for EVERYONE (admins and users) */}
+    <div style={{ padding: 16, display: 'grid', gap: 12 }} className='max-w-7xl mx-auto'>
+      {/* Search & view mode */}
       <div style={{
-        display: 'flex',
-        gap: 8,
-        alignItems: 'center',
-        flexWrap: 'wrap',
-        padding: 16,
-        background: '#f8fafc',
-        borderRadius: 16,
-        border: '1px solid #e5e7eb',
+        display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap',
+        padding: 16, background: '#f8fafc', borderRadius: 16, border: '1px solid #e5e7eb',
       }}>
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search by ID, date, items, status..."
           style={{
-            flex: 1,
-            minWidth: 280,
-            padding: '10px 12px',
-            border: '1px solid #cbd5e1',
-            borderRadius: 12,
-            outline: 'none',
-            fontSize: 14,
+            flex: 1, minWidth: 280, padding: '10px 12px',
+            border: '1px solid #cbd5e1', borderRadius: 12, outline: 'none', fontSize: 14,
           }}
         />
-        {/* Admin view toggle - only shown for admins */}
-        {isAdmin && (
+        {userIsStaff && (
           <div style={{ display: 'flex', gap: 8 }}>
             <Button variant={role === 'customer' ? 'solid' : 'outline'} onClick={() => setRole('customer')}>
               Customer view
@@ -595,19 +516,13 @@ export default function OrderViewsDemo({ orders = [], onOrderUpdate }) {
         )}
       </div>
 
-      {/* Results counter */}
-      {search && (
-        <div style={{ fontSize: 13, color: '#64748b', paddingLeft: 4 }}>
-          Found {filteredOrders.length} order{filteredOrders.length !== 1 ? 's' : ''}
-        </div>
-      )}
-
-      {/* Orders list */}
+      {/* List */}
       {filteredOrders.map((order) => (
-        <OrderCard 
-          key={order._id} 
-          initialOrder={order} 
-          role={isAdmin ? role : 'customer'} 
+        <OrderCard
+          key={order._id}
+          initialOrder={order}
+          role={userIsStaff ? role : 'customer'}
+          canDelete={userIsAdmin}        // cashier cannot delete
           onRefresh={onOrderUpdate}
           onDelete={() => onOrderUpdate()}
         />

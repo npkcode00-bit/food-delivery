@@ -9,7 +9,7 @@ export default async function ProfilePage() {
 
   // Render the client form; it will fetch the latest profile via /api/profile
   return (
-    <section className="py-8">
+    <section className="max-w-7xl mx-auto py-8">
       <h1 className="text-2xl font-semibold mb-4">My Profile</h1>
       <ProfileForm />
     </section>

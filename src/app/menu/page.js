@@ -42,7 +42,7 @@ export default function MenuPage() {
   if (status === 'loading' || BLOCKED.has(role)) return null;
 
   return (
-    <section className="mt-8">
+    <section className="max-w-7xl mx-auto mt-8">
       {categories?.length > 0 && categories.map(c => (
         <div key={c._id}>
           <div className="text-center">

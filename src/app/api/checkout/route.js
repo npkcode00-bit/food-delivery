@@ -52,7 +52,6 @@ export async function POST(req) {
 
       let productPrice = Number(productInfo.basePrice) || 0;
 
-      // Enriched product with full price info
       const enrichedProduct = {
         _id: String(cartProduct._id),
         name: cartProduct.name || productInfo.name || 'Item',
@@ -64,7 +63,7 @@ export async function POST(req) {
       // Size price
       if (cartProduct.size?._id) {
         const sizeInfo = productInfo.sizes?.find(
-          s => String(s._id) === String(cartProduct.size._id)
+          (s) => String(s._id) === String(cartProduct.size._id)
         );
         if (sizeInfo) {
           const sizePrice = Number(sizeInfo.price) || 0;
@@ -81,7 +80,7 @@ export async function POST(req) {
       if (Array.isArray(cartProduct.extras) && cartProduct.extras.length) {
         for (const extra of cartProduct.extras) {
           const extraInfo = productInfo.extraIngredientPrices?.find(
-            e => String(e._id) === String(extra._id)
+            (e) => String(e._id) === String(extra._id)
           );
           if (extraInfo) {
             const extraPrice = Number(extraInfo.price) || 0;
@@ -107,7 +106,7 @@ export async function POST(req) {
       });
     }
 
-    // Add delivery fee
+    // Delivery fee
     const DELIVERY_FEE_PHP = Number(process.env.DELIVERY_FEE_PHP || 50);
     if (DELIVERY_FEE_PHP > 0) {
       lineItems.push({
@@ -119,7 +118,7 @@ export async function POST(req) {
       totalPrice += DELIVERY_FEE_PHP;
     }
 
-    // ✅ Create a CheckoutIntent (NO Order yet)
+    // Create CheckoutIntent (no Order yet)
     const intent = await CheckoutIntent.create({
       userEmail: billingEmail,
       address: {
@@ -155,7 +154,6 @@ export async function POST(req) {
 
           line_items: lineItems,
           send_email_receipt: true,
-          // ✅ FIXED: Redirect to intent page, which will show order once created
           success_url: `${base}orders?intent=${intentId}&clear-cart=1`,
           cancel_url: `${base}cart?canceled=1`,
           billing: {
@@ -182,9 +180,9 @@ export async function POST(req) {
     const resp = await fetch('https://api.paymongo.com/v1/checkout_sessions', {
       method: 'POST',
       headers: {
-        'Authorization': `Basic ${auth}`,
+        Authorization: `Basic ${auth}`,
         'Content-Type': 'application/json',
-        'Accept': 'application/json',
+        Accept: 'application/json',
       },
       body: JSON.stringify(payload),
     });
@@ -202,12 +200,11 @@ export async function POST(req) {
       return Response.json({ error: 'No checkout_url from PayMongo' }, { status: 502 });
     }
 
-    // Save the PayMongo session id on the intent
+    // Save PayMongo session id on the intent
     if (checkoutSessionId) {
       await CheckoutIntent.findByIdAndUpdate(intentId, { checkoutSessionId });
     }
 
-    // Return PayMongo hosted checkout URL (frontend should redirect the browser)
     return Response.json(checkoutUrl);
   } catch (err) {
     console.error('Checkout error:', err);

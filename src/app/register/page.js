@@ -45,7 +45,7 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="max-w-md mx-auto my-10">
+    <div className="max-w-7xl mx-auto my-10">
       <h1 className="text-2xl font-semibold mb-6">Create an account</h1>
       <form onSubmit={onSubmit} className="flex flex-col gap-4">
         <input
