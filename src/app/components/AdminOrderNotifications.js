@@ -16,6 +16,7 @@ export default function AdminOrderNotifications() {
   const hasInitializedRef = useRef(false);
   const hasShownLoginNotificationRef = useRef(false);
   const seenIdsRef = useRef(new Set()); // track seen order IDs to detect truly new orders
+  const hasShownErrorToastRef = useRef(false); // prevent error toast spam
 
   const fmtPHP = (n) =>
     new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(Number(n || 0));
@@ -47,23 +48,46 @@ export default function AdminOrderNotifications() {
     const checkForNewOrders = async () => {
       try {
         const res = await fetch('/api/orders', { cache: 'no-store' });
+        
         if (!res.ok) {
-          console.error('Failed to fetch orders:', res.status);
+          // Try to get error details from response
+          let errorDetails = '';
+          try {
+            const errorText = await res.text();
+            errorDetails = errorText;
+            console.error('Failed to fetch orders:', res.status, errorText);
+          } catch {
+            console.error('Failed to fetch orders:', res.status);
+          }
+
+          // Show user-friendly error toast (only once per session)
+          if (!hasShownErrorToastRef.current && hasInitializedRef.current) {
+            hasShownErrorToastRef.current = true;
+            toast.error('Unable to load orders. Please refresh the page.', {
+              duration: 5000,
+              position: 'top-right',
+            });
+          }
           return;
         }
 
         const contentType = res.headers.get('content-type');
         if (!contentType || !contentType.includes('application/json')) {
           console.error('Expected JSON but got:', contentType);
+          const text = await res.text();
+          console.error('Response body:', text.substring(0, 200));
           return;
         }
 
         const data = await res.json();
         if (!Array.isArray(data)) {
-          console.error('Expected array but got:', typeof data);
+          console.error('Expected array but got:', typeof data, data);
           return;
         }
         if (cancelled) return;
+
+        // Reset error flag on successful fetch
+        hasShownErrorToastRef.current = false;
 
         // FIRST LOAD: show all currently "placed" orders (up to 10), then mark all as seen
         if (!hasInitializedRef.current) {
@@ -255,6 +279,20 @@ export default function AdminOrderNotifications() {
         seenIdsRef.current = currentIds;
       } catch (err) {
         console.error('Error checking for new orders:', err);
+        console.error('Error details:', {
+          message: err.message,
+          stack: err.stack,
+          name: err.name
+        });
+        
+        // Show error toast only once
+        if (!hasShownErrorToastRef.current && hasInitializedRef.current) {
+          hasShownErrorToastRef.current = true;
+          toast.error('Connection error. Retrying...', {
+            duration: 3000,
+            position: 'top-right',
+          });
+        }
       }
     };
 
@@ -270,4 +308,4 @@ export default function AdminOrderNotifications() {
 
   // No UI
   return null;
-}
+} 

@@ -7,8 +7,18 @@ import { CheckoutIntent } from '../../models/CheckoutIntent';
 export const runtime = 'nodejs';
 
 async function dbConnect() {
-  if (mongoose.connection.readyState >= 1) return;
-  await mongoose.connect(process.env.MONGO_URL);
+  try {
+    if (mongoose.connection.readyState >= 1) {
+      console.log('✅ MongoDB already connected');
+      return;
+    }
+    console.log('🔌 Connecting to MongoDB...');
+    await mongoose.connect(process.env.MONGO_URL);
+    console.log('✅ MongoDB connected successfully');
+  } catch (error) {
+    console.error('❌ MongoDB connection error:', error);
+    throw new Error(`Database connection failed: ${error.message}`);
+  }
 }
 
 function isAdmin(session) {
@@ -45,6 +55,7 @@ async function fetchCheckoutSession(id, diag) {
   diag?.push?.({ step: 'fetchCheckoutSession', ok: true, id, hasAttributes: !!data?.data?.attributes });
   return data?.data;
 }
+
 async function fetchPayment(id, diag) {
   const headers = basicAuthHeader();
   const url = `https://api.paymongo.com/v1/payments/${id}`;
@@ -58,6 +69,7 @@ async function fetchPayment(id, diag) {
   diag?.push?.({ step: 'fetchPayment', ok: true, id, status });
   return data?.data;
 }
+
 async function fetchPaymentIntent(id, diag) {
   const headers = basicAuthHeader();
   const url = `https://api.paymongo.com/v1/payment_intents/${id}`;
@@ -71,6 +83,7 @@ async function fetchPaymentIntent(id, diag) {
   diag?.push?.({ step: 'fetchPaymentIntent', ok: true, id, status });
   return data?.data;
 }
+
 async function isCheckoutSessionPaidWithDiag(checkoutSessionId, diag) {
   if (!checkoutSessionId) {
     diag?.push?.({ step: 'isPaid', ok: false, reason: 'no checkoutSessionId' });
@@ -114,139 +127,289 @@ async function isCheckoutSessionPaidWithDiag(checkoutSessionId, diag) {
 
 /** ROUTES **/
 export async function GET(req) {
-  await dbConnect();
+  console.log('📡 Orders API GET called');
+  
+  try {
+    // Connect to database
+    await dbConnect();
 
-  const session = await getServerSession(authOptions);
-  const userEmail = session?.user?.email;
-  const staff = isStaff(session);
-  const admin = isAdmin(session);
+    // Get session
+    console.log('🔐 Getting session...');
+    const session = await getServerSession(authOptions);
+    const userEmail = session?.user?.email;
+    const staff = isStaff(session);
+    const admin = isAdmin(session);
 
-  if (!userEmail) {
-    return Response.json({ error: 'Not authenticated' }, { status: 401 });
-  }
+    console.log('👤 User:', userEmail, '| Staff:', staff, '| Admin:', admin);
 
-  const { searchParams } = new URL(req.url);
-  const intentId = searchParams.get('intent');
-  const debug = searchParams.get('debug') === '1';
+    if (!userEmail) {
+      console.log('❌ No user email in session');
+      return Response.json({ error: 'Not authenticated' }, { status: 401 });
+    }
 
-  // FINALIZE path: /api/orders?intent=...
-  if (intentId) {
-    const diag = debug ? [{ step: 'start', intentId, userEmail }] : undefined;
+    const { searchParams } = new URL(req.url);
+    const intentId = searchParams.get('intent');
+    const debug = searchParams.get('debug') === '1';
 
-    try {
-      // Already created?
-      let order = await Order.findOne({ 'paymentInfo.intentId': intentId });
-      if (order) {
-        if (!staff && order.userEmail !== userEmail) {
+    // FINALIZE path: /api/orders?intent=...
+    if (intentId) {
+      console.log('🎯 Finalize path with intentId:', intentId);
+      const diag = debug ? [{ step: 'start', intentId, userEmail }] : undefined;
+
+      try {
+        // Already created?
+        let order = await Order.findOne({ 'paymentInfo.intentId': intentId });
+        if (order) {
+          console.log('✅ Order already exists:', order._id);
+          if (!staff && order.userEmail !== userEmail) {
+            console.log('❌ Unauthorized access attempt');
+            return Response.json(debug ? { error: 'Unauthorized', diag } : { error: 'Unauthorized' }, { status: 403 });
+          }
+          return Response.json(debug ? { order, diag } : order);
+        }
+
+        // Load intent
+        console.log('🔍 Loading CheckoutIntent...');
+        const intent = await CheckoutIntent.findById(intentId);
+        if (!intent) {
+          console.log('❌ CheckoutIntent not found');
+          return Response.json(debug ? { error: 'CheckoutIntent not found', diag } : { error: 'CheckoutIntent not found' }, { status: 404 });
+        }
+        if (!staff && intent.userEmail !== userEmail) {
+          console.log('❌ Unauthorized intent access');
           return Response.json(debug ? { error: 'Unauthorized', diag } : { error: 'Unauthorized' }, { status: 403 });
         }
+
+        // Verify paid
+        console.log('💳 Verifying payment...');
+        const paid = await isCheckoutSessionPaidWithDiag(intent.checkoutSessionId, diag);
+        if (!paid) {
+          console.log('❌ Payment not verified');
+          return Response.json(debug ? { error: 'Order not found', diag } : { error: 'Order not found' }, { status: 404 });
+        }
+
+        // Create order (idempotent if you add unique index on paymentInfo.intentId)
+        console.log('📝 Creating order...');
+        order = await Order.create({
+          userEmail: intent.userEmail,
+          cartProducts: intent.cartProducts,
+          address: intent.address,
+          totalPrice: intent.totalPrice,
+          status: 'placed',
+          paid: true,
+          paymentInfo: {
+            provider: 'paymongo',
+            intentId: String(intent._id),
+            checkoutSessionId: intent.checkoutSessionId || null,
+          },
+        });
+        console.log('✅ Order created:', order._id);
+
+        await CheckoutIntent.findByIdAndUpdate(intentId, {
+          status: 'consumed',
+          orderId: order._id,
+        });
+        console.log('✅ CheckoutIntent updated');
+
         return Response.json(debug ? { order, diag } : order);
+      } catch (err) {
+        console.error('❌ [Orders GET finalize] Error:', err);
+        console.error('Error stack:', err.stack);
+        const body = debug 
+          ? { error: 'Finalize failed', details: String(err?.message || err), stack: err.stack } 
+          : { error: 'Finalize failed' };
+        return Response.json(body, { status: 500 });
       }
+    }
 
-      // Load intent
-      const intent = await CheckoutIntent.findById(intentId);
-      if (!intent) {
-        return Response.json(debug ? { error: 'CheckoutIntent not found', diag } : { error: 'CheckoutIntent not found' }, { status: 404 });
-      }
-      if (!staff && intent.userEmail !== userEmail) {
-        return Response.json(debug ? { error: 'Unauthorized', diag } : { error: 'Unauthorized' }, { status: 403 });
-      }
+    // LIST: staff (admin, cashier, accounting) sees ALL; customers see own
+    console.log('📋 Listing orders...');
+    try {
+      const orders = staff
+        ? await Order.find().sort({ createdAt: -1 }).lean()
+        : await Order.find({ userEmail }).sort({ createdAt: -1 }).lean();
 
-      // Verify paid
-      const paid = await isCheckoutSessionPaidWithDiag(intent.checkoutSessionId, diag);
-      if (!paid) {
-        return Response.json(debug ? { error: 'Order not found', diag } : { error: 'Order not found' }, { status: 404 });
-      }
-
-      // Create order (idempotent if you add unique index on paymentInfo.intentId)
-      order = await Order.create({
-        userEmail: intent.userEmail,
-        cartProducts: intent.cartProducts,
-        address: intent.address,
-        totalPrice: intent.totalPrice,
-        status: 'placed',
-        paid: true,
-        paymentInfo: {
-          provider: 'paymongo',
-          intentId: String(intent._id),
-          checkoutSessionId: intent.checkoutSessionId || null,
+      console.log(`✅ Found ${orders.length} orders`);
+      
+      return Response.json(orders, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Cache-Control': 'no-store, no-cache, must-revalidate',
         },
       });
-
-      await CheckoutIntent.findByIdAndUpdate(intentId, {
-        status: 'consumed',
-        orderId: order._id,
+    } catch (dbError) {
+      console.error('❌ Database query error:', dbError);
+      console.error('Error details:', {
+        message: dbError.message,
+        name: dbError.name,
+        stack: dbError.stack,
       });
-
-      return Response.json(debug ? { order, diag } : order);
-    } catch (err) {
-      console.error('[Orders GET finalize] Error:', err);
-      const body = debug ? { error: 'Finalize failed', err: String(err?.message || err) } : { error: 'Finalize failed' };
-      return Response.json(body, { status: 500 });
+      throw dbError; // Re-throw to be caught by outer try-catch
     }
+  } catch (error) {
+    console.error('❌ Orders API GET Error:', error);
+    console.error('Error details:', {
+      message: error.message,
+      name: error.name,
+      stack: error.stack,
+    });
+
+    // Return detailed error in development, generic in production
+    const isDev = process.env.NODE_ENV === 'development';
+    return Response.json(
+      {
+        error: 'Failed to fetch orders',
+        details: isDev ? error.message : undefined,
+        stack: isDev ? error.stack : undefined,
+      },
+      { 
+        status: 500,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
   }
-
-  // LIST: staff (admin, cashier, accounting) sees ALL; customers see own
-  const orders = staff
-    ? await Order.find().sort({ createdAt: -1 })
-    : await Order.find({ userEmail }).sort({ createdAt: -1 });
-
-  return Response.json(orders);
 }
 
 export async function PATCH(req) {
-  await dbConnect();
-  const session = await getServerSession(authOptions);
-  if (!isStaff(session)) {
-    return Response.json({ error: 'Unauthorized' }, { status: 403 });
+  console.log('📡 Orders API PATCH called');
+  
+  try {
+    await dbConnect();
+    
+    const session = await getServerSession(authOptions);
+    console.log('👤 User:', session?.user?.email);
+    
+    if (!isStaff(session)) {
+      console.log('❌ Unauthorized: not staff');
+      return Response.json({ error: 'Unauthorized' }, { status: 403 });
+    }
+
+    const body = await req.json();
+    const { orderId, status } = body;
+    
+    console.log('🔄 Updating order:', orderId, 'to status:', status);
+
+    if (!orderId || !status) {
+      return Response.json({ error: 'Order ID and status are required' }, { status: 400 });
+    }
+
+    const updatedOrder = await Order.findByIdAndUpdate(
+      orderId, 
+      { status },
+      { new: true }
+    );
+
+    if (!updatedOrder) {
+      return Response.json({ error: 'Order not found' }, { status: 404 });
+    }
+
+    console.log('✅ Order updated successfully');
+    return Response.json({ ok: true, status, order: updatedOrder });
+  } catch (error) {
+    console.error('❌ Orders API PATCH Error:', error);
+    return Response.json(
+      { 
+        error: 'Failed to update order',
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined 
+      },
+      { status: 500 }
+    );
   }
-  const { orderId, status } = await req.json();
-  await Order.findByIdAndUpdate(orderId, { status });
-  return Response.json({ ok: true, status });
 }
 
 export async function PUT(req) {
-  await dbConnect();
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.email) {
-    return Response.json({ error: 'Not authenticated' }, { status: 401 });
-  }
-  const { orderId } = await req.json();
-  if (!orderId) return Response.json({ error: 'Order ID is required' }, { status: 400 });
-
+  console.log('📡 Orders API PUT called');
+  
   try {
+    await dbConnect();
+    
+    const session = await getServerSession(authOptions);
+    console.log('👤 User:', session?.user?.email);
+    
+    if (!session?.user?.email) {
+      console.log('❌ Not authenticated');
+      return Response.json({ error: 'Not authenticated' }, { status: 401 });
+    }
+
+    const body = await req.json();
+    const { orderId } = body;
+    
+    if (!orderId) {
+      return Response.json({ error: 'Order ID is required' }, { status: 400 });
+    }
+
+    console.log('💰 Marking order as paid:', orderId);
+
     const order = await Order.findById(orderId);
-    if (!order) return Response.json({ error: 'Order not found' }, { status: 404 });
+    if (!order) {
+      console.log('❌ Order not found');
+      return Response.json({ error: 'Order not found' }, { status: 404 });
+    }
+    
     if (order.userEmail !== session.user.email && !isStaff(session)) {
+      console.log('❌ Unauthorized access attempt');
       return Response.json({ error: 'Unauthorized' }, { status: 403 });
     }
+
     order.paid = true;
     await order.save();
+    
+    console.log('✅ Order marked as paid');
     return Response.json({ success: true, order });
   } catch (error) {
-    console.error('Error marking order as paid:', error);
-    return Response.json({ error: 'Failed to update order' }, { status: 500 });
+    console.error('❌ Orders API PUT Error:', error);
+    return Response.json(
+      { 
+        error: 'Failed to update order',
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined 
+      },
+      { status: 500 }
+    );
   }
 }
 
 export async function DELETE(req) {
-  await dbConnect();
-  const session = await getServerSession(authOptions);
-  if (!isAdmin(session)) {
-    return Response.json({ error: 'Unauthorized' }, { status: 403 });
-  }
-
-  const { searchParams } = new URL(req.url);
-  const _id = searchParams.get('_id');
-  if (!_id) return Response.json({ error: 'Order ID is required' }, { status: 400 });
-
+  console.log('📡 Orders API DELETE called');
+  
   try {
+    await dbConnect();
+    
+    const session = await getServerSession(authOptions);
+    console.log('👤 User:', session?.user?.email);
+    
+    if (!isAdmin(session)) {
+      console.log('❌ Unauthorized: not admin');
+      return Response.json({ error: 'Unauthorized' }, { status: 403 });
+    }
+
+    const { searchParams } = new URL(req.url);
+    const _id = searchParams.get('_id');
+    
+    if (!_id) {
+      return Response.json({ error: 'Order ID is required' }, { status: 400 });
+    }
+
+    console.log('🗑️ Deleting order:', _id);
+
     const result = await Order.deleteOne({ _id });
+    
     if (result.deletedCount === 0) {
+      console.log('❌ Order not found');
       return Response.json({ error: 'Order not found' }, { status: 404 });
     }
+
+    console.log('✅ Order deleted successfully');
     return Response.json({ success: true });
-  } catch {
-    return Response.json({ error: 'Failed to delete order' }, { status: 500 });
+  } catch (error) {
+    console.error('❌ Orders API DELETE Error:', error);
+    return Response.json(
+      { 
+        error: 'Failed to delete order',
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined 
+      },
+      { status: 500 }
+    );
   }
 }

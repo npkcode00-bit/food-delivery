@@ -41,7 +41,7 @@ if (isPrivileged) {
         <SectionHeaders subHeader="Don't hesitate" mainHeader="Contact us" />
         <div className="mt-8">
          <a
-            href="https://www.facebook.com/profile.php?id=61579343604645"
+            href="https://web.facebook.com/profile.php?id=61565188780261"
             className="text-2xl underline text-gray-500 inline-flex items-center gap-2"
             target="_blank"
             rel="noopener noreferrer"
