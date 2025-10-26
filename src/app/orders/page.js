@@ -1,3 +1,4 @@
+// app/orders/page.jsx
 'use client';
 
 import { Suspense } from 'react';
@@ -8,7 +9,6 @@ import toast from 'react-hot-toast';
 import { CartContext } from '../components/AppContext';
 import OrderViewsDemo from '../components/layout/OrderViewsDemo';
 
-// Wrap the main component logic in a separate component
 function OrdersContent() {
   const { status } = useSession();
   const router = useRouter();
@@ -55,7 +55,7 @@ function OrdersContent() {
           const res = await fetch(url, { cache: 'no-store' });
 
           if (res.ok) {
-            await res.json(); // contains order; (with debug=1 it includes diag)
+            await res.json();
             toast.success('Payment successful! Thank you for your order.', { duration: 5000 });
 
             if (clear) {
@@ -77,7 +77,7 @@ function OrdersContent() {
         } catch (err) {
           console.error('[Orders] finalize poll error:', err);
         }
-        await new Promise(r => setTimeout(r, 2000)); // wait 2s
+        await new Promise(r => setTimeout(r, 2000));
       }
 
       if (!cancelled) {
@@ -100,6 +100,7 @@ function OrdersContent() {
     if (status === 'unauthenticated') setLoading(false);
   }, [status, intent, pollingForIntent]);
 
+  // Simple states (unchanged functionality)
   if (status === 'loading' || loading) {
     return (
       <div style={{ padding: 16, textAlign: 'center' }}>
@@ -123,15 +124,18 @@ function OrdersContent() {
         <h2>Processing your payment...</h2>
         <p>Please wait while we confirm your order.</p>
         <div style={{ marginTop: 16 }}>
-          <div className="spinner" style={{
-            border: '4px solid #f3f3f3',
-            borderTop: '4px solid #3498db',
-            borderRadius: '50%',
-            width: '40px',
-            height: '40px',
-            animation: 'spin 1s linear infinite',
-            margin: '0 auto'
-          }} />
+          <div
+            className="spinner"
+            style={{
+              border: '4px solid #f3f3f3',
+              borderTop: '4px solid #8B5E34', // brown accent
+              borderRadius: '50%',
+              width: '40px',
+              height: '40px',
+              animation: 'spin 1s linear infinite',
+              margin: '0 auto',
+            }}
+          />
         </div>
         <style jsx>{`
           @keyframes spin {
@@ -143,17 +147,41 @@ function OrdersContent() {
     );
   }
 
-  return <OrderViewsDemo orders={orders} onOrderUpdate={fetchOrders} />;
+  // ===== Wrapped with the same "blurred blobs + single rounded container" shell as Home =====
+  return (
+    <section className="relative">
+      {/* Soft wallpaper blobs (brown/coffee tones to match the app) */}
+      <div className="pointer-events-none absolute inset-0 -z-10">
+        <div className="absolute left-1/2 top-[-12%] h-80 w-80 -translate-x-1/2 rounded-full bg-gradient-to-br from-[#F3EDE2] to-[#D8C3A5] opacity-50 blur-3xl" />
+        <div className="absolute bottom-[-12%] left-8 h-72 w-72 rounded-full bg-gradient-to-br from-[#F2D6C1] to-[#E2B992] opacity-30 blur-3xl" />
+        <div className="absolute right-10 top-1/3 h-64 w-64 rounded-full bg-gradient-to-br from-[#E2D2BE] to-[#B08B62] opacity-30 blur-3xl" />
+      </div>
+
+      {/* Single rounded container (matches home) */}
+      <div className="mx-auto max-w-7xl overflow-hidden rounded-2xl">
+        {/* Glossy top highlight */}
+        <div className="pointer-events-none relative">
+          <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-white/50 to-transparent" />
+        </div>
+
+        {/* Inner content padding */}
+        <div className="px-6 py-10 md:px-12 md:py-14">
+          <OrderViewsDemo orders={orders} onOrderUpdate={fetchOrders} />
+        </div>
+      </div>
+    </section>
+  );
 }
 
-// Main page component - just wraps with Suspense
 export default function OrdersPage() {
   return (
-    <Suspense fallback={
-      <div style={{ padding: 16, textAlign: 'center' }}>
-        <p>Loading orders...</p>
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div style={{ padding: 16, textAlign: 'center' }}>
+          <p>Loading orders...</p>
+        </div>
+      }
+    >
       <OrdersContent />
     </Suspense>
   );

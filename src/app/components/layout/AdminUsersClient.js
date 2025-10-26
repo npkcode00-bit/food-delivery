@@ -12,11 +12,8 @@ const ROLE_OPTIONS = [
 ];
 
 const parseMaybeJson = async (res) => {
-  // Try JSON; if not JSON, fall back to text for a helpful error
   const ct = res.headers.get('content-type') || '';
-  if (ct.includes('application/json')) {
-    return await res.json();
-  }
+  if (ct.includes('application/json')) return await res.json();
   const text = await res.text();
   return { message: text || `${res.status} ${res.statusText}` };
 };
@@ -134,186 +131,241 @@ export default function AdminUsersClient() {
   const rows = useMemo(() => users, [users]);
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <label className="text-sm text-gray-600">Filter by role</label>
-        <select
-          className="border rounded-md px-3 py-2 cursor-pointer"
-          value={roleFilter}
-          onChange={(e) => setRoleFilter(e.target.value)}
-        >
-          {ROLE_OPTIONS.map((r) => (
-            <option className='cursor-pointer' key={r.value} value={r.value}>{r.label}</option>
-          ))}
-        </select>
-        <button
-        style={{maxWidth:'300px'}}
-          className="ml-auto border rounded-md px-3 py-2 cursor-pointer"
-          onClick={() => loadUsers(roleFilter)}
-        >
-          Refresh
-        </button>
-      </div>
-
-      <div className="overflow-x-auto border rounded-lg">
-        <table className="min-w-full text-sm">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="text-left px-4 py-3">Name</th>
-              <th className="text-left px-4 py-3">Email</th>
-              <th className="text-left px-4 py-3">Phone</th>
-              <th className="text-left px-4 py-3">Address</th>
-              <th className="text-left px-4 py-3">Role</th>
-              <th className="text-left px-4 py-3">Created</th>
-              <th className="text-left px-4 py-3">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {loading && (
-              <tr>
-                <td className="px-4 py-4 text-gray-500" colSpan={7}>Loading…</td>
-              </tr>
-            )}
-            {!loading && rows.length === 0 && (
-              <tr>
-                <td className="px-4 py-4 text-gray-500" colSpan={7}>No users</td>
-              </tr>
-            )}
-            {!loading && rows.map((u) => (
-              <tr key={u._id} className="border-t">
-                <td className="px-4 py-3">{(u.firstName || '') + ' ' + (u.lastName || '')}</td>
-                <td className="px-4 py-3">{u.email}</td>
-                <td className="px-4 py-3">{u.phone || ''}</td>
-                <td className="px-4 py-3">{u.address || ''}</td>
-                <td className="px-4 py-3">
-                  <span className="inline-block rounded-full px-2 py-0.5 text-xs border">
-                    {u.role || (u.admin ? 'admin' : 'customer')}
-                  </span>
-                </td>
-                <td className="px-4 py-3">{new Date(u.createdAt).toLocaleString()}</td>
-                <td className="px-4 py-3 space-x-2">
-                  <button className="border rounded-md px-3 py-1 cursor-pointer mb-2" onClick={() => onEditClick(u)}>
-                    Edit
-                  </button>
-                  <button className="border rounded-md px-3 py-1 text-red-600 cursor-pointer" onClick={() => onDeleteClick(u)}>
-                    Delete
-                  </button>
-                </td>
-              </tr>
+    <div className="grid grid-cols-1 gap-6 md:grid-cols-12">
+      {/* Sidebar (mobile dropdown + desktop list) */}
+      <aside className="md:col-span-3">
+        {/* Mobile dropdown */}
+        <div className="md:hidden mb-4">
+          <select
+            className="w-full rounded-xl border border-[#B08B62]/60 bg-white/80 px-4 py-2 text-zinc-700 backdrop-blur-md focus:outline-none focus:ring-2 focus:ring-[#8B5E34]/60"
+            value={roleFilter}
+            onChange={(e) => setRoleFilter(e.target.value)}
+          >
+            {ROLE_OPTIONS.map((r) => (
+              <option key={r.value} value={r.value}>
+                {r.label}
+              </option>
             ))}
-          </tbody>
-        </table>
-      </div>
+          </select>
+        </div>
 
-      {/* Edit modal */}
-      {editing && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg shadow-lg max-w-lg w-full">
-            <div className="px-5 py-4 border-b">
-              <h2 className="text-lg font-semibold">Edit user</h2>
+        {/* Desktop list */}
+        <div className="hidden md:block sticky top-6">
+          <div className="rounded-2xl border border-white/30 bg-white/60 p-3 backdrop-blur-xl">
+            <h3 className="px-2 pb-2 text-sm font-semibold uppercase tracking-wide text-zinc-600">
+              Filter by role
+            </h3>
+            <ul className="space-y-1">
+              {ROLE_OPTIONS.map((r) => {
+                const active = roleFilter === r.value;
+                return (
+                  <li key={r.value}>
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => setRoleFilter(r.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          setRoleFilter(r.value);
+                        }
+                      }}
+                      className={[
+                        'block w-full select-none text-left rounded-xl px-3 py-3 outline-none transition cursor-pointer',
+                        'focus-visible:ring-2 focus-visible:ring-[#8B5E34]/50',
+                        active
+                          ? 'bg-gradient-to-r from-[#A5724A] to-[#7A4E2A] text-white shadow-lg shadow-[#A5724A]/25'
+                          : 'text-zinc-700 hover:bg-white/80',
+                      ].join(' ')}
+                      aria-pressed={active}
+                    >
+                      {r.label}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+
+            <div className="mt-3 px-2">
+              <button
+                className="w-full rounded-xl border border-[#B08B62]/50 bg-white/80 px-4 py-2 text-sm font-semibold text-zinc-700 hover:bg-white/90 focus:outline-none focus:ring-2 focus:ring-[#8B5E34]/50"
+                onClick={() => loadUsers(roleFilter)}
+              >
+                Refresh
+              </button>
             </div>
-            <div className="p-5 space-y-3">
-              <div className="grid grid-cols-2 gap-3">
+          </div>
+        </div>
+      </aside>
+
+      {/* Main content */}
+      <main className="md:col-span-9">
+        <div className="overflow-x-auto rounded-2xl border border-black/30 bg-white/70 backdrop-blur-xl">
+          <table className="min-w-full text-sm">
+            <thead className="bg-white/60">
+              <tr className="text-left">
+                <th className="px-4 py-3">Name</th>
+                <th className="px-4 py-3">Email</th>
+                <th className="px-4 py-3">Phone</th>
+                <th className="px-4 py-3">Address</th>
+                <th className="px-4 py-3">Role</th>
+                <th className="px-4 py-3">Created</th>
+                <th className="px-4 py-3">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {loading && (
+                <tr>
+                  <td className="px-4 py-4 text-gray-500" colSpan={7}>Loading…</td>
+                </tr>
+              )}
+              {!loading && rows.length === 0 && (
+                <tr>
+                  <td className="px-4 py-4 text-gray-500" colSpan={7}>No users</td>
+                </tr>
+              )}
+              {!loading && rows.map((u) => (
+                <tr key={u._id} className="border-t">
+                  <td className="px-4 py-3">{(u.firstName || '') + ' ' + (u.lastName || '')}</td>
+                  <td className="px-4 py-3">{u.email}</td>
+                  <td className="px-4 py-3">{u.phone || ''}</td>
+                  <td className="px-4 py-3">{u.address || ''}</td>
+                  <td className="px-4 py-3">
+                    <span className="inline-block rounded-full border px-2 py-0.5 text-xs">
+                      {u.role || (u.admin ? 'admin' : 'customer')}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3">{new Date(u.createdAt).toLocaleString()}</td>
+                  <td className="px-4 py-3 space-x-2">
+                    <button
+                      className="mb-2 rounded-md border px-3 py-1 cursor-pointer"
+                      onClick={() => onEditClick(u)}
+                    >
+                      Edit
+                    </button>
+                    <button
+                      className="rounded-md border px-3 py-1 text-red-600 cursor-pointer"
+                      onClick={() => onDeleteClick(u)}
+                    >
+                      Delete
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Edit modal */}
+        {editing && (
+          <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+            <div className="bg-white rounded-lg shadow-lg max-w-lg w-full">
+              <div className="px-5 py-4 border-b">
+                <h2 className="text-lg font-semibold">Edit user</h2>
+              </div>
+              <div className="p-5 space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-gray-600">First name</label>
+                    <input
+                      className="border rounded-md w-full px-3 py-2"
+                      value={editing.firstName}
+                      onChange={(e) => setEditing({ ...editing, firstName: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label className="text-xs text-gray-600">Last name</label>
+                    <input
+                      className="border rounded-md w-full px-3 py-2"
+                      value={editing.lastName}
+                      onChange={(e) => setEditing({ ...editing, lastName: e.target.value })}
+                    />
+                  </div>
+                </div>
                 <div>
-                  <label className="text-xs text-gray-600">First name</label>
+                  <label className="text-xs text-gray-600">Email</label>
                   <input
                     className="border rounded-md w-full px-3 py-2"
-                    value={editing.firstName}
-                    onChange={(e) => setEditing({ ...editing, firstName: e.target.value })}
+                    value={editing.email}
+                    onChange={(e) => setEditing({ ...editing, email: e.target.value })}
                   />
                 </div>
                 <div>
-                  <label className="text-xs text-gray-600">Last name</label>
+                  <label className="text-xs text-gray-600">Phone</label>
                   <input
                     className="border rounded-md w-full px-3 py-2"
-                    value={editing.lastName}
-                    onChange={(e) => setEditing({ ...editing, lastName: e.target.value })}
+                    value={editing.phone}
+                    onChange={(e) => setEditing({ ...editing, phone: e.target.value })}
                   />
                 </div>
+                <div>
+                  <label className="text-xs text-gray-600">Address</label>
+                  <input
+                    className="border rounded-md w-full px-3 py-2"
+                    value={editing.address}
+                    onChange={(e) => setEditing({ ...editing, address: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <label className="text-xs text-gray-600">Role</label>
+                  <select
+                    className="border rounded-md w-full px-3 py-2 cursor-pointer"
+                    value={editing.role}
+                    onChange={(e) => setEditing({ ...editing, role: e.target.value })}
+                  >
+                    {ROLE_OPTIONS.filter(r => r.value !== 'all').map((r) => (
+                      <option key={r.value} value={r.value}>{r.label}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
-              <div>
-                <label className="text-xs text-gray-600">Email</label>
-                <input
-                  className="border rounded-md w-full px-3 py-2"
-                  value={editing.email}
-                  onChange={(e) => setEditing({ ...editing, email: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="text-xs text-gray-600">Phone</label>
-                <input
-                  className="border rounded-md w-full px-3 py-2"
-                  value={editing.phone}
-                  onChange={(e) => setEditing({ ...editing, phone: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="text-xs text-gray-600">Address</label>
-                <input
-                  className="border rounded-md w-full px-3 py-2"
-                  value={editing.address}
-                  onChange={(e) => setEditing({ ...editing, address: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="text-xs text-gray-600">Role</label>
-                <select
-                  className="border rounded-md w-full px-3 py-2 cursor-pointer"
-                  value={editing.role}
-                  onChange={(e) => setEditing({ ...editing, role: e.target.value })}
+              <div className="px-5 py-4 border-t flex justify-end gap-2">
+                <button className="border rounded-md px-4 py-2 cursor-pointer" onClick={onCloseEdit} disabled={saving}>
+                  Cancel
+                </button>
+                <button
+                  className="bg-primary text-white rounded-md px-4 py-2 disabled:opacity-60 cursor-pointer"
+                  onClick={onSave}
+                  disabled={saving}
                 >
-                  {ROLE_OPTIONS.filter(r => r.value !== 'all').map((r) => (
-                    <option key={r.value} value={r.value}>{r.label}</option>
-                  ))}
-                </select>
+                  {saving ? 'Saving…' : 'Save'}
+                </button>
               </div>
             </div>
-            <div className="px-5 py-4 border-t flex justify-end gap-2">
-              <button className="border rounded-md px-4 py-2 cursor-pointer" onClick={onCloseEdit} disabled={saving}>
-                Cancel
-              </button>
-              <button
-                className="bg-primary text-white rounded-md px-4 py-2 disabled:opacity-60 cursor-pointer"
-                onClick={onSave}
-                disabled={saving}
-              >
-                {saving ? 'Saving…' : 'Save'}
-              </button>
-            </div>
           </div>
-        </div>
-      )}
+        )}
 
-      {/* Delete confirm */}
-      {deletingUser && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-          <div className="bg-white rounded-lg shadow-lg max-w-md w-full">
-            <div className="px-5 py-4 border-b">
-              <h2 className="text-lg font-semibold">Delete user</h2>
-            </div>
-            <div className="p-5 space-y-3">
-              <p>
-                Are you sure you want to delete{' '}
-                <strong>{(deletingUser.firstName || '') + ' ' + (deletingUser.lastName || '')}</strong>
-                {' '}({deletingUser.email})?
-              </p>
-              <p className="text-sm text-gray-600">This action cannot be undone.</p>
-            </div>
-            <div className="px-5 py-4 border-t flex justify-end gap-2">
-              <button className="border rounded-md px-4 py-2 cursor-pointer" onClick={onCancelDelete} disabled={deleting}>
-                Cancel
-              </button>
-              <button
-                className="bg-red-600 text-white rounded-md px-4 py-2 disabled:opacity-60 cursor-pointer"
-                onClick={onConfirmDelete}
-                disabled={deleting}
-              >
-                {deleting ? 'Deleting…' : 'Delete'}
-              </button>
+        {/* Delete confirm */}
+        {deletingUser && (
+          <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+            <div className="bg-white rounded-lg shadow-lg max-w-md w-full">
+              <div className="px-5 py-4 border-b">
+                <h2 className="text-lg font-semibold">Delete user</h2>
+              </div>
+              <div className="p-5 space-y-3">
+                <p>
+                  Are you sure you want to delete{' '}
+                  <strong>{(deletingUser.firstName || '') + ' ' + (deletingUser.lastName || '')}</strong>
+                  {' '}({deletingUser.email})?
+                </p>
+                <p className="text-sm text-gray-600">This action cannot be undone.</p>
+              </div>
+              <div className="px-5 py-4 border-t flex justify-end gap-2">
+                <button className="border rounded-md px-4 py-2 cursor-pointer" onClick={onCancelDelete} disabled={deleting}>
+                  Cancel
+                </button>
+                <button
+                  className="bg-red-600 text-white rounded-md px-4 py-2 disabled:opacity-60 cursor-pointer"
+                  onClick={onConfirmDelete}
+                  disabled={deleting}
+                >
+                  {deleting ? 'Deleting…' : 'Delete'}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </main>
     </div>
   );
 }

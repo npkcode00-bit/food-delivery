@@ -1,3 +1,4 @@
+// src/app/components/AdminOrderNotifications.js
 'use client';
 
 import { useEffect, useRef } from 'react';
@@ -16,7 +17,12 @@ export default function AdminOrderNotifications() {
   const hasInitializedRef = useRef(false);
   const hasShownLoginNotificationRef = useRef(false);
   const seenIdsRef = useRef(new Set()); // track seen order IDs to detect truly new orders
-  const hasShownErrorToastRef = useRef(false); // prevent error toast spam
+
+  // Error/Backoff controls
+  const offlineToastShownRef = useRef(false);
+  const backoffMsRef = useRef(5000);          // start: 5s
+  const nextAllowedRef = useRef(0);           // next timestamp allowed to poll
+  const MAX_BACKOFF_MS = 60000;               // cap at 60s
 
   const fmtPHP = (n) =>
     new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(Number(n || 0));
@@ -45,55 +51,92 @@ export default function AdminOrderNotifications() {
 
     let cancelled = false;
 
+    // small helper: only run if backoff window has elapsed
+    const canRunNow = () => Date.now() >= nextAllowedRef.current;
+
+    const scheduleBackoff = (multiplier = 2) => {
+      backoffMsRef.current = Math.min(
+        backoffMsRef.current * multiplier,
+        MAX_BACKOFF_MS
+      );
+      nextAllowedRef.current = Date.now() + backoffMsRef.current;
+    };
+
+    const resetBackoff = () => {
+      backoffMsRef.current = 5000;
+      nextAllowedRef.current = Date.now() + backoffMsRef.current;
+    };
+
+    // Show a single persistent "offline" toast, dismiss on recovery
+    const showOfflineToastOnce = (msg = 'Orders backend unreachable. Retrying…') => {
+      if (offlineToastShownRef.current) return;
+      offlineToastShownRef.current = true;
+      toast.error(msg, { id: 'orders-offline', duration: Infinity, position: 'top-right' });
+    };
+    const hideOfflineToast = () => {
+      if (!offlineToastShownRef.current) return;
+      offlineToastShownRef.current = false;
+      toast.dismiss('orders-offline');
+    };
+
+    const parseMaybeJson = async (res) => {
+      const ct = res.headers.get('content-type') || '';
+      const text = await res.text();
+      if (ct.includes('application/json')) {
+        try { return JSON.parse(text); } catch { /* fall through */ }
+      }
+      return { _raw: text };
+    };
+
+    const isConnectivityLikeError = (payload) => {
+      const str =
+        typeof payload === 'string'
+          ? payload
+          : JSON.stringify(payload || '');
+      return /ETIMEOUT|ENOTFOUND|ECONN|Database connection failed|MongoServerError/i.test(str);
+    };
+
     const checkForNewOrders = async () => {
+      if (!canRunNow()) return;
+
       try {
         const res = await fetch('/api/orders', { cache: 'no-store' });
-        
+
         if (!res.ok) {
-          // Try to get error details from response
-          let errorDetails = '';
-          try {
-            const errorText = await res.text();
-            errorDetails = errorText;
-            console.error('Failed to fetch orders:', res.status, errorText);
-          } catch {
-            console.error('Failed to fetch orders:', res.status);
-          }
+          // Read body safely, detect connectivity error, then back off politely
+          let body;
+          try { body = await parseMaybeJson(res); } catch { body = {}; }
 
-          // Show user-friendly error toast (only once per session)
-          if (!hasShownErrorToastRef.current && hasInitializedRef.current) {
-            hasShownErrorToastRef.current = true;
-            toast.error('Unable to load orders. Please refresh the page.', {
-              duration: 5000,
-              position: 'top-right',
-            });
-          }
+          const detail = body?.details || body?.error || body?._raw || `HTTP ${res.status}`;
+          const connecty = isConnectivityLikeError(body);
+
+          // Keep console noise low, but still useful
+          console.warn('[AdminOrderNotifications] orders fetch failed:', res.status, connecty ? '(connectivity)' : '', detail?.slice?.(0, 180));
+
+          // Show one persistent toast; increase backoff
+          showOfflineToastOnce(connecty ? 'Cannot reach database. Retrying…' : 'Unable to load orders. Retrying…');
+          scheduleBackoff(connecty ? 2 : 1.5);
           return;
         }
 
-        const contentType = res.headers.get('content-type');
-        if (!contentType || !contentType.includes('application/json')) {
-          console.error('Expected JSON but got:', contentType);
-          const text = await res.text();
-          console.error('Response body:', text.substring(0, 200));
-          return;
-        }
-
-        const data = await res.json();
+        // Good response: parse and proceed
+        const data = await parseMaybeJson(res);
         if (!Array.isArray(data)) {
-          console.error('Expected array but got:', typeof data, data);
+          console.warn('[AdminOrderNotifications] Expected array, got:', typeof data);
+          showOfflineToastOnce('Unexpected response. Retrying…');
+          scheduleBackoff(1.5);
           return;
         }
         if (cancelled) return;
 
-        // Reset error flag on successful fetch
-        hasShownErrorToastRef.current = false;
+        // Recovery path: dismiss offline toast and reset backoff
+        hideOfflineToast();
+        resetBackoff();
 
-        // FIRST LOAD: show all currently "placed" orders (up to 10), then mark all as seen
+        // FIRST LOAD: announce up to 10 "placed" orders & mark seen
         if (!hasInitializedRef.current) {
           hasInitializedRef.current = true;
 
-          // Build seen set from current list so subsequent checks only react to truly *new* orders
           seenIdsRef.current = new Set(data.map(o => String(o?._id)));
 
           const placedOrders = data.filter(o => o?.status === 'placed');
@@ -137,18 +180,6 @@ export default function AdminOrderNotifications() {
                         <div style={{ fontSize: 13, color: '#64748b', marginBottom: 12, wordBreak: 'break-word' }}>
                           Customer: {order.userEmail}
                         </div>
-
-                        {Array.isArray(order.cartProducts) && order.cartProducts.slice(0, 2).map((item, idx) => (
-                          <div key={idx} style={{ fontSize: 12, color: '#475569', marginBottom: 2 }}>
-                            • {item?.name}
-                          </div>
-                        ))}
-                        {Array.isArray(order.cartProducts) && order.cartProducts.length > 2 && (
-                          <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 8 }}>
-                            +{order.cartProducts.length - 2} more items
-                          </div>
-                        )}
-
                         <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
                           <button
                             onClick={() => { toast.dismiss(t.id); window.location.href = '/orders'; }}
@@ -187,16 +218,16 @@ export default function AdminOrderNotifications() {
             }
           }
 
-          return; // skip "new order" diffing on first load
+          return; // skip diffing on first load
         }
 
-        // SUBSEQUENT POLLS: find orders not yet seen -> only notify for brand-new ones (preferably status=placed)
+        // SUBSEQUENT POLLS: find truly new orders (unseen)
         const currentIds = new Set(data.map(o => String(o?._id)));
         const newOrders = data.filter(o => !seenIdsRef.current.has(String(o?._id)));
+
         if (newOrders.length > 0) {
           for (const latestOrder of newOrders) {
-            // Only toast for new *placed* orders (avoid noise for edits)
-            if (latestOrder?.status !== 'placed') continue;
+            if (latestOrder?.status !== 'placed') continue; // avoid noise for edits
 
             const totalPrice = calcTotal(latestOrder);
 
@@ -225,21 +256,6 @@ export default function AdminOrderNotifications() {
                     <div style={{ fontSize: 16, color: '#111', fontWeight: 600, marginBottom: 6 }}>
                       Total: {fmtPHP(totalPrice)}
                     </div>
-                    <div style={{ fontSize: 13, color: '#64748b', marginBottom: 12, wordBreak: 'break-word' }}>
-                      Customer: {latestOrder.userEmail}
-                    </div>
-
-                    {Array.isArray(latestOrder.cartProducts) && latestOrder.cartProducts.slice(0, 2).map((item, idx) => (
-                      <div key={idx} style={{ fontSize: 12, color: '#475569', marginBottom: 2 }}>
-                        • {item?.name}
-                      </div>
-                    ))}
-                    {Array.isArray(latestOrder.cartProducts) && latestOrder.cartProducts.length > 2 && (
-                      <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 8 }}>
-                        +{latestOrder.cartProducts.length - 2} more items
-                      </div>
-                    )}
-
                     <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
                       <button
                         onClick={() => { toast.dismiss(t.id); window.location.href = '/orders'; }}
@@ -267,36 +283,22 @@ export default function AdminOrderNotifications() {
               </div>
             ), { duration: Infinity, position: 'top-right' });
 
-            // Play a sound (best-effort)
-            try {
-              const audio = new Audio('/notification.mp3');
-              audio.play().catch(() => {});
-            } catch {}
+            // try a sound (best-effort)
+            try { new Audio('/notification.mp3').play().catch(() => {}); } catch {}
           }
         }
 
-        // Update seen set to current
+        // mark current as seen
         seenIdsRef.current = currentIds;
       } catch (err) {
-        console.error('Error checking for new orders:', err);
-        console.error('Error details:', {
-          message: err.message,
-          stack: err.stack,
-          name: err.name
-        });
-        
-        // Show error toast only once
-        if (!hasShownErrorToastRef.current && hasInitializedRef.current) {
-          hasShownErrorToastRef.current = true;
-          toast.error('Connection error. Retrying...', {
-            duration: 3000,
-            position: 'top-right',
-          });
-        }
+        // Network/runtime error: treat like connectivity, back off
+        console.warn('[AdminOrderNotifications] network error:', err?.message || err);
+        showOfflineToastOnce('Connection error. Retrying…');
+        scheduleBackoff(2);
       }
     };
 
-    // initial + every 5s
+    // Initial kick + fixed heartbeat; backoff gate controls actual calls
     checkForNewOrders();
     const interval = setInterval(checkForNewOrders, 5000);
 
@@ -308,4 +310,4 @@ export default function AdminOrderNotifications() {
 
   // No UI
   return null;
-} 
+}

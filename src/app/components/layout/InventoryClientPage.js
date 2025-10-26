@@ -8,7 +8,7 @@ export default function InventoryClientPage() {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // create form (kept as-is)
+  // create form
   const [form, setForm] = useState({
     name: '',
     category: '',
@@ -20,6 +20,17 @@ export default function InventoryClientPage() {
   const [q, setQ] = useState('');
   const [editOpen, setEditOpen] = useState(false);
   const [editItem, setEditItem] = useState(null);
+
+  // accordion open state
+  const [openIds, setOpenIds] = useState(() => new Set());
+
+  const toggleOpen = (id) =>
+    setOpenIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
 
   const fetchItems = async () => {
     try {
@@ -210,184 +221,233 @@ export default function InventoryClientPage() {
   }, [items, q]);
 
   return (
-    <section className="max-w-6xl mx-auto py-6">
-      <h1 className="text-2xl font-bold mb-4">Inventory</h1>
+    <section className="relative">
+      {/* soft brown blurred wallpaper */}
+      <div className="pointer-events-none absolute inset-0 -z-10">
+        <div className="absolute left-1/2 top-[-12%] h-80 w-80 -translate-x-1/2 rounded-full bg-gradient-to-br from-[#F3EDE2] to-[#D8C3A5] opacity-50 blur-3xl" />
+        <div className="absolute bottom-[-12%] left-8 h-72 w-72 rounded-full bg-gradient-to-br from-[#F2D6C1] to-[#E2B992] opacity-30 blur-3xl" />
+        <div className="absolute right-10 top-1/3 h-64 w-64 rounded-full bg-gradient-to-br from-[#E2D2BE] to-[#B08B62] opacity-30 blur-3xl" />
+      </div>
 
-      {/* ---------------- Create item (unchanged UI) ---------------- */}
-      <form onSubmit={createItem} className="border rounded-lg p-4 mb-8 space-y-3">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-          <input
-            className="border rounded p-2"
-            placeholder="Item name (e.g., plastic caps)"
-            value={form.name}
-            onChange={(e) => setForm({ ...form, name: e.target.value })}
-          />
-          <input
-            className="border rounded p-2"
-            placeholder="Category (e.g., packaging)"
-            value={form.category}
-            onChange={(e) => setForm({ ...form, category: e.target.value })}
-          />
-          <input
-            className="border rounded p-2"
-            placeholder="Notes"
-            value={form.notes}
-            onChange={(e) => setForm({ ...form, notes: e.target.value })}
-          />
-        </div>
+      <div className="mx-auto max-w-7xl px-6 py-10 md:px-12 md:py-14">
+        <h1 className="text-2xl font-semibold text-zinc-900">Inventory</h1>
 
-        <div className="space-y-2">
-          <div className="font-semibold">Variants</div>
-          {form.variants.map((v, i) => (
-            <div key={i} className="grid grid-cols-12 gap-2">
+        {/* mac-style window card */}
+        <div className="mt-6 rounded-2xl border border-white/30 bg-white/70 p-6 shadow-sm backdrop-blur-xl">
+          {/* Create item */}
+          <form onSubmit={createItem} className="rounded-xl border border-white/40 bg-white/70 p-4 md:p-5 backdrop-blur-md">
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
               <input
-                className="col-span-5 md:col-span-5 border rounded p-2"
-                placeholder="Variant name (e.g., small, per sack)"
-                value={v.name}
-                onChange={(e) => updateVariant(i, 'name', e.target.value)}
+                className="rounded-xl border border-zinc-300/70 bg-white/90 px-3 py-2 outline-none placeholder:text-zinc-400 focus:border-[#A5724A] focus:ring-2 focus:ring-[#8B5E34]/30"
+                placeholder="Item name (e.g., plastic caps)"
+                value={form.name}
+                onChange={(e) => setForm({ ...form, name: e.target.value })}
               />
               <input
-                className="col-span-3 md:col-span-3 border rounded p-2"
-                placeholder="Unit (pcs, sack, kg, plate)"
-                value={v.unit}
-                onChange={(e) => updateVariant(i, 'unit', e.target.value)}
+                className="rounded-xl border border-zinc-300/70 bg-white/90 px-3 py-2 outline-none placeholder:text-zinc-400 focus:border-[#A5724A] focus:ring-2 focus:ring-[#8B5E34]/30"
+                placeholder="Category (e.g., packaging)"
+                value={form.category}
+                onChange={(e) => setForm({ ...form, category: e.target.value })}
               />
               <input
-                type="number"
-                className="col-span-4 md:col-span-4 border rounded p-2"
-                placeholder="Stock"
-                value={v.stock}
-                onChange={(e) => updateVariant(i, 'stock', e.target.value)}
+                className="rounded-xl border border-zinc-300/70 bg-white/90 px-3 py-2 outline-none placeholder:text-zinc-400 focus:border-[#A5724A] focus:ring-2 focus:ring-[#8B5E34]/30"
+                placeholder="Notes"
+                value={form.notes}
+                onChange={(e) => setForm({ ...form, notes: e.target.value })}
               />
             </div>
-          ))}
-          <button
-            type="button"
-            className="border rounded p-2 cursor-pointer"
-            onClick={addVariantRow}
-          >
-            + Add variant
-          </button>
-        </div>
 
-        <button style={{color:'white'}} className="bg-black text-white rounded px-4 py-2 cursor-pointer">
-          Create
-        </button>
-      </form>
-
-      {/* ---------------- Table header / search ---------------- */}
-      <div className="mb-3 flex items-center justify-between gap-3">
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Search items, categories, notes, or variants…"
-          className="w-full md:w-96 border rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-slate-300"
-        />
-        <div className="text-sm text-slate-500">
-          {filtered.length} result{filtered.length === 1 ? '' : 's'}
-        </div>
-      </div>
-
-      {/* ---------------- mac-style table ---------------- */}
-      <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-slate-700 sticky top-0">
-              <tr className="[&>th]:py-3 [&>th]:px-3 border-b border-slate-200">
-                <th className="text-left w-48">Item</th>
-                <th className="text-left w-36">Category</th>
-                <th className="text-left w-40">Variant</th>
-                <th className="text-left w-24">Unit</th>
-                <th className="text-right w-24">Stock</th>
-                <th className="text-left">Notes</th>
-                <th className="text-right w-[200px]">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {loading ? (
-                <tr>
-                  <td colSpan={8} className="py-6 text-center text-slate-500">
-                    Loading…
-                  </td>
-                </tr>
-              ) : filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="py-8 text-center text-slate-500">
-                    No items match your search.
-                  </td>
-                </tr>
-              ) : (
-                filtered.flatMap((item, idx) => {
-                  const rows = item.variants?.length ? item.variants : [null];
-                  return rows.map((v, i) => {
-                    const low =
-                      v &&
-                      typeof v.lowStockThreshold === 'number' &&
-                      Number(v.stock) <= Number(v.lowStockThreshold);
-                    return (
-                      <tr
-                        key={`${item._id}-${v?._id || i}`}
-                        className={idx % 2 === 1 ? 'bg-slate-50/50' : ''}
-                      >
-                        <td className="py-3 px-3 align-top">
-                          <div className="font-medium text-slate-900">{item.name}</div>
-                        </td>
-                        <td className="py-3 px-3 align-top text-slate-700">{item.category}</td>
-                        <td className="py-3 px-3 align-top">
-                          {v ? v.name : <span className="text-slate-400">—</span>}
-                        </td>
-                        <td className="py-3 px-3 align-top">
-                          {v ? v.unit : <span className="text-slate-400">—</span>}
-                        </td>
-                        <td
-                          className={`py-3 px-3 align-top text-right ${
-                            low ? 'text-amber-600 font-semibold' : ''
-                          }`}
-                        >
-                          {v ? v.stock : <span className="text-slate-400">—</span>}
-                        </td>
-                        <td className="py-3 px-3 align-top text-slate-500">
-                          {i === 0 ? item.notes : ''}
-                        </td>
-                        <td className="py-3 px-3 align-top">
-                          {/* Item-level controls only once per item (first row) */}
-                          {i === 0 && (
-                            <div className="flex flex-wrap justify-end gap-2">
-                              <button
-                                className="border border-slate-300 rounded-md px-3 py-1 hover:bg-slate-50 cursor-pointer"
-                                onClick={() => openEdit(item)}
-                              >
-                                Edit
-                              </button>
-                              <button
-                                className="border border-red-300 text-red-600 rounded-md px-3 py-1 hover:bg-red-50 cursor-pointer"
-                                onClick={() => deleteItem(item._id)}
-                              >
-                                Delete
-                              </button>
-                            </div>
-                          )}
-                        </td>
-                      </tr>
-                    );
-                  });
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* ---------------- EDIT MODAL ---------------- */}
-      {editOpen && editItem && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 grid place-items-center p-4">
-          <div className="w-full max-w-3xl bg-white rounded-xl shadow-xl border border-slate-200">
-            {/* Header */}
-            <div className="px-4 py-3 border-b flex items-center justify-between">
-              <h3 className="font-semibold text-lg">Edit Item</h3>
+            <div className="mt-4 space-y-2">
+              <div className="font-semibold text-zinc-800">Variants</div>
+              {form.variants.map((v, i) => (
+                <div key={i} className="grid grid-cols-12 gap-2">
+                  <input
+                    className="col-span-6 md:col-span-5 rounded-xl border border-zinc-300/70 bg-white/90 px-3 py-2 outline-none placeholder:text-zinc-400 focus:border-[#A5724A] focus:ring-2 focus:ring-[#8B5E34]/30"
+                    placeholder="Variant name (e.g., Small / per sack)"
+                    value={v.name}
+                    onChange={(e) => updateVariant(i, 'name', e.target.value)}
+                  />
+                  <input
+                    className="col-span-3 md:col-span-3 rounded-xl border border-zinc-300/70 bg-white/90 px-3 py-2 outline-none placeholder:text-zinc-400 focus:border-[#A5724A] focus:ring-2 focus:ring-[#8B5E34]/30"
+                    placeholder="Unit (pcs, sack, kg)"
+                    value={v.unit}
+                    onChange={(e) => updateVariant(i, 'unit', e.target.value)}
+                  />
+                  <input
+                    type="number"
+                    className="col-span-3 md:col-span-4 rounded-xl border border-zinc-300/70 bg-white/90 px-3 py-2 outline-none placeholder:text-zinc-400 focus:border-[#A5724A] focus:ring-2 focus:ring-[#8B5E34]/30"
+                    placeholder="Stock"
+                    value={v.stock}
+                    onChange={(e) => updateVariant(i, 'stock', e.target.value)}
+                  />
+                </div>
+              ))}
               <button
-              style={{maxWidth:'100px'}}
-                className="rounded-md p-2 hover:bg-slate-100 text-slate-600 cursor-pointer"
+                type="button"
+                className="cursor-pointer rounded-full border border-[#B08B62]/50 bg-white/80 px-4 py-2 text-sm font-semibold text-zinc-700 hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8B5E34]/60"
+                onClick={addVariantRow}
+              >
+                + Add variant
+              </button>
+            </div>
+
+            <div className="mt-4">
+              <button
+                className="cursor-pointer inline-flex items-center justify-center rounded-full border border-white/30 bg-gradient-to-r from-[#A5724A] to-[#7A4E2A] px-5 py-2.5 !text-white shadow-md shadow-[#A5724A]/20 transition hover:shadow-[#A5724A]/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8B5E34]/60"
+              >
+                Create
+              </button>
+            </div>
+          </form>
+
+          {/* Search bar */}
+          <div className="mt-8 flex flex-col items-start justify-between gap-3 sm:flex-row sm:items-center">
+            <input
+              value={q}
+              onChange={(e) => setQ(e.target.value)}
+              placeholder="Search items, categories, notes, or variants…"
+              className="w-full rounded-xl border border-zinc-300/70 bg-white/90 px-3 py-2 outline-none placeholder:text-zinc-400 focus:border-[#A5724A] focus:ring-2 focus:ring-[#8B5E34]/30 sm:w-96"
+            />
+            <div className="text-sm text-zinc-600">
+              {filtered.length} result{filtered.length === 1 ? '' : 's'}
+            </div>
+          </div>
+
+          {/* Accordion list (dropdown table) */}
+          <div className="mt-4 divide-y divide-white/40 rounded-xl border border-white/40 bg-white/70 backdrop-blur-md">
+            {loading ? (
+              <div className="py-8 text-center text-zinc-500">Loading…</div>
+            ) : filtered.length === 0 ? (
+              <div className="py-12 text-center text-zinc-500">No items match your search.</div>
+            ) : (
+              filtered.map((item) => {
+                const hasLow =
+                  Array.isArray(item.variants) &&
+                  item.variants.some(
+                    (v) =>
+                      typeof v?.lowStockThreshold === 'number' &&
+                      Number(v.stock) <= Number(v.lowStockThreshold)
+                  );
+                const open = openIds.has(item._id);
+                const count = item.variants?.length || 0;
+
+                return (
+                  <div key={item._id} className="group">
+                    {/* Header row */}
+                    <div
+                      className="flex cursor-pointer items-center gap-3 px-4 py-4 hover:bg-white/80"
+                      onClick={() => toggleOpen(item._id)}
+                      aria-expanded={open}
+                    >
+                      <span
+                        className={[
+                          'grid h-6 w-6 place-items-center rounded-full border text-xs font-bold transition',
+                          open
+                            ? 'border-[#7A4E2A] bg-[#A5724A] !text-white'
+                            : 'border-zinc-300 bg-white text-zinc-700',
+                        ].join(' ')}
+                      >
+                        {open ? '−' : '+'}
+                      </span>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <div className="truncate font-semibold text-zinc-900">{item.name}</div>
+                          <span className="rounded-full border border-[#B08B62]/40 bg-white/80 px-2 py-0.5 text-xs font-medium text-zinc-700">
+                            {item.category || '—'}
+                          </span>
+                          {count > 0 && (
+                            <span className="rounded-full bg-zinc-100 px-2 py-0.5 text-xs text-zinc-600">
+                              {count} variant{count > 1 ? 's' : ''}
+                            </span>
+                          )}
+                          {hasLow && (
+                            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">
+                              Low stock
+                            </span>
+                          )}
+                        </div>
+                        {item.notes && (
+                          <div className="mt-1 line-clamp-1 text-sm text-zinc-500">{item.notes}</div>
+                        )}
+                      </div>
+
+                      <div className="flex shrink-0 gap-2">
+                        <button
+                          className="cursor-pointer rounded-md border border-zinc-300 bg-white px-3 py-1 text-sm font-semibold text-zinc-700 hover:bg-zinc-50"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openEdit(item);
+                          }}
+                        >
+                          Edit
+                        </button>
+                        <button
+                          className="cursor-pointer rounded-md border border-red-300 bg-white px-3 py-1 text-sm font-semibold text-red-600 hover:bg-red-50"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            deleteItem(item._id);
+                          }}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Dropdown content */}
+                    {open && (
+                      <div className="px-4 pb-4">
+                        <div className="overflow-x-auto rounded-xl border border-white/40">
+                          <table className="w-full text-sm">
+                            <thead className="bg-zinc-50 text-zinc-700">
+                              <tr className="[&>th]:py-2.5 [&>th]:px-3 border-b border-zinc-200">
+                                <th className="text-left">Variant</th>
+                                <th className="text-left w-28">Unit</th>
+                                <th className="text-right w-28">Stock</th>
+                                <th className="text-right w-40">Low threshold</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-zinc-100">
+                              {(item.variants?.length ? item.variants : [{ name: '—', unit: '—', stock: '—' }]).map(
+                                (v, i) => {
+                                  const low =
+                                    v &&
+                                    typeof v.lowStockThreshold === 'number' &&
+                                    Number(v.stock) <= Number(v.lowStockThreshold);
+                                  return (
+                                    <tr key={v?._id || i} className="[&>td]:py-2.5 [&>td]:px-3">
+                                      <td className="text-zinc-900">{v?.name ?? '—'}</td>
+                                      <td className="text-zinc-700">{v?.unit ?? '—'}</td>
+                                      <td className={`text-right ${low ? 'text-amber-700 font-semibold' : 'text-zinc-800'}`}>
+                                        {v?.stock ?? '—'}
+                                      </td>
+                                      <td className="text-right text-zinc-500">{v?.lowStockThreshold ?? '—'}</td>
+                                    </tr>
+                                  );
+                                }
+                              )}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </div>
+      </div>
+
+      {/* EDIT MODAL */}
+      {editOpen && editItem && (
+        <div className="fixed inset-0 z-50 grid place-items-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="w-full max-w-3xl overflow-hidden rounded-2xl border border-white/30 bg-white shadow-xl">
+            {/* Header */}
+            <div className="flex items-center justify-between border-b px-4 py-3">
+              <h3 className="text-lg font-semibold">Edit Item</h3>
+              <button
+                className="cursor-pointer rounded-md p-2 text-zinc-600 hover:bg-zinc-100"
                 onClick={() => {
                   setEditOpen(false);
                   setEditItem(null);
@@ -400,22 +460,22 @@ export default function InventoryClientPage() {
             </div>
 
             {/* Body */}
-            <div className="p-4 space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <div className="space-y-4 p-4">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                 <input
-                  className="border rounded p-2"
+                  className="rounded-xl border border-zinc-300/70 bg-white/90 px-3 py-2 outline-none placeholder:text-zinc-400 focus:border-[#A5724A] focus:ring-2 focus:ring-[#8B5E34]/30"
                   placeholder="Item name"
                   value={editItem.name || ''}
                   onChange={(e) => setEditItem({ ...editItem, name: e.target.value })}
                 />
                 <input
-                  className="border rounded p-2"
+                  className="rounded-xl border border-zinc-300/70 bg-white/90 px-3 py-2 outline-none placeholder:text-zinc-400 focus:border-[#A5724A] focus:ring-2 focus:ring-[#8B5E34]/30"
                   placeholder="Category"
                   value={editItem.category || ''}
                   onChange={(e) => setEditItem({ ...editItem, category: e.target.value })}
                 />
                 <input
-                  className="border rounded p-2"
+                  className="rounded-xl border border-zinc-300/70 bg-white/90 px-3 py-2 outline-none placeholder:text-zinc-400 focus:border-[#A5724A] focus:ring-2 focus:ring-[#8B5E34]/30"
                   placeholder="Notes"
                   value={editItem.notes || ''}
                   onChange={(e) => setEditItem({ ...editItem, notes: e.target.value })}
@@ -423,33 +483,32 @@ export default function InventoryClientPage() {
               </div>
 
               <div>
-                <div className="font-semibold mb-2">Variants</div>
+                <div className="mb-2 font-semibold text-zinc-800">Variants</div>
                 <div className="space-y-2">
                   {(editItem.variants || []).map((v, i) => (
-                    <div key={v._id || i} className="grid grid-cols-12 gap-2 items-start">
+                    <div key={v._id || i} className="grid grid-cols-12 items-start gap-2">
                       <input
-                        className="col-span-4 border rounded p-2"
+                        className="col-span-5 rounded-xl border border-zinc-300/70 bg-white/90 px-3 py-2 outline-none placeholder:text-zinc-400 focus:border-[#A5724A] focus:ring-2 focus:ring-[#8B5E34]/30"
                         placeholder="Variant name"
                         value={v.name || ''}
                         onChange={(e) => updateEditVariant(i, 'name', e.target.value)}
                       />
                       <input
-                        className="col-span-2 border rounded p-2"
+                        className="col-span-3 rounded-xl border border-zinc-300/70 bg-white/90 px-3 py-2 outline-none placeholder:text-zinc-400 focus:border-[#A5724A] focus:ring-2 focus:ring-[#8B5E34]/30"
                         placeholder="Unit"
                         value={v.unit || ''}
                         onChange={(e) => updateEditVariant(i, 'unit', e.target.value)}
                       />
                       <input
                         type="number"
-                        className="col-span-2 border rounded p-2"
+                        className="col-span-3 rounded-xl border border-zinc-300/70 bg-white/90 px-3 py-2 outline-none placeholder:text-zinc-400 focus:border-[#A5724A] focus:ring-2 focus:ring-[#8B5E34]/30"
                         placeholder="Stock"
                         value={v.stock ?? 0}
                         onChange={(e) => updateEditVariant(i, 'stock', e.target.value)}
                       />
                       <button
-                      style={{padding:'10px'}}
                         type="button"
-                        className="border border-red-300 text-red-600 rounded-md py-2 hover:bg-red-50 cursor-pointer"
+                        className="col-span-1 cursor-pointer rounded-md border border-red-300 py-2 text-red-600 hover:bg-red-50"
                         onClick={() => removeEditVariant(i)}
                         title="Remove variant"
                         aria-label="Remove variant"
@@ -461,7 +520,7 @@ export default function InventoryClientPage() {
                 </div>
                 <button
                   type="button"
-                  className="mt-2 border rounded p-2 cursor-pointer hover:bg-slate-50"
+                  className="mt-2 cursor-pointer rounded-full border border-[#B08B62]/50 bg-white/80 px-4 py-2 text-sm font-semibold text-zinc-700 hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8B5E34]/60"
                   onClick={addEditVariant}
                 >
                   + Add variant
@@ -470,9 +529,9 @@ export default function InventoryClientPage() {
             </div>
 
             {/* Footer */}
-            <div className="px-4 py-3 border-t flex items-center justify-end gap-2">
+            <div className="flex items-center justify-end gap-2 border-t px-4 py-3">
               <button
-                className="border rounded-md px-4 py-2 hover:bg-slate-50 cursor-pointer"
+                className="cursor-pointer rounded-md border border-zinc-300 bg-white px-4 py-2 font-semibold text-zinc-700 hover:bg-zinc-50"
                 onClick={() => {
                   setEditOpen(false);
                   setEditItem(null);
@@ -481,8 +540,7 @@ export default function InventoryClientPage() {
                 Cancel
               </button>
               <button
-              style={{color:'white'}}
-                className="bg-black text-white rounded-md px-4 py-2 cursor-pointer"
+                className="cursor-pointer inline-flex items-center justify-center rounded-full border border-white/30 bg-gradient-to-r from-[#A5724A] to-[#7A4E2A] px-5 py-2.5 !text-white shadow-md shadow-[#A5724A]/20 transition hover:shadow-[#A5724A]/40"
                 onClick={saveEdit}
               >
                 Save changes

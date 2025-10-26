@@ -3,6 +3,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSession } from 'next-auth/react';
 
+/** format a Date to YYYY-MM-DD in LOCAL time (for <input type="date">) */
+function formatDateInput(d) {
+  const pad = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
 function peso(n = 0) {
   return new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(Number(n || 0));
 }
@@ -10,7 +16,6 @@ function peso(n = 0) {
 function calcOrderTotal(order) {
   if (typeof order?.totalPrice === 'number') return order.totalPrice;
 
-  // derive from cartProducts (basePrice + size.price + extras[].price)
   if (Array.isArray(order?.cartProducts)) {
     const itemsTotal = order.cartProducts.reduce((sum, item) => {
       let price = Number(item?.basePrice || 0);
@@ -23,7 +28,6 @@ function calcOrderTotal(order) {
     return itemsTotal;
   }
 
-  // legacy fallback
   if (Array.isArray(order?.items)) {
     return order.items.reduce((s, it) => s + Number(it?.qty || 0) * Number(it?.price || 0), 0);
   }
@@ -42,17 +46,23 @@ export default function AccountingDashboardPage() {
 
   // filters
   const [q, setQ] = useState('');
-  const today = new Date();
-  const sevenDaysAgo = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 6);
-  const [from, setFrom] = useState(sevenDaysAgo.toISOString().slice(0, 10));
-  const [to, setTo] = useState(today.toISOString().slice(0, 10));
+
+  // Default to start-of-month → end-of-month (local)
+  const now = new Date();
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+  const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+
+  const [from, setFrom] = useState(formatDateInput(monthStart));
+  const [to, setTo] = useState(formatDateInput(monthEnd));
+
+  // Dropdown/accordion state for the table (hidden by default)
+  const [showTable, setShowTable] = useState(false);
 
   useEffect(() => {
     if (status !== 'authenticated') return;
     (async () => {
       try {
         setLoading(true);
-        // server should return ALL orders for admin/accounting (see API tweak below)
         const res = await fetch('/api/orders', { cache: 'no-store' });
         const data = await res.json();
         setOrders(Array.isArray(data) ? data : []);
@@ -65,7 +75,7 @@ export default function AccountingDashboardPage() {
   }, [status]);
 
   const fromDate = useMemo(() => new Date(from + 'T00:00:00'), [from]);
-  const toDate = useMemo(() => new Date(to + 'T23:59:59'), [to]);
+  const toDate = useMemo(() => new Date(to + 'T23:59:59.999'), [to]);
 
   // Filter by date + search
   const filtered = useMemo(() => {
@@ -111,20 +121,12 @@ export default function AccountingDashboardPage() {
     return { sales: _sales, received: _received, unpaidCount: _unpaid, txCount: _tx };
   }, [filtered]);
 
-  const balance = received; // adjust here if you later subtract payouts/expenses
+  const balance = received;
 
   const printPage = () => window.print();
 
   const exportCSV = () => {
-    const headers = [
-      'Date',
-      'Time',
-      'OrderID',
-      'Customer',
-      'Status',
-      'Paid',
-      'Amount',
-    ];
+    const headers = ['Date', 'Time', 'OrderID', 'Customer', 'Status', 'Paid', 'Amount'];
     const rows = filtered.map((o) => {
       const d = new Date(o.createdAt);
       const date = d.toLocaleDateString('en-PH');
@@ -186,122 +188,150 @@ export default function AccountingDashboardPage() {
   }
 
   return (
-    <section className="max-w-7xl mx-auto py-6">
-      <div className="flex items-center justify-between mb-4">
-        <h1 className="text-2xl font-bold">Accounting Dashboard</h1>
-        <div className="no-print flex gap-2">
-          <button
-            onClick={exportCSV}
-            className="border rounded-lg px-3 py-2 hover:bg-slate-50 cursor-pointer"
-          >
-            Export CSV
-          </button>
-          <button
-            onClick={printPage}
-            className="bg-black text-white rounded-lg px-3 py-2 cursor-pointer"
-          >
-            Print
-          </button>
-        </div>
+    <section className="relative">
+      {/* soft brown blurred wallpaper */}
+      <div className="pointer-events-none absolute inset-0 -z-10">
+        <div className="absolute left-1/2 top-[-12%] h-80 w-80 -translate-x-1/2 rounded-full bg-gradient-to-br from-[#F3EDE2] to-[#D8C3A5] opacity-50 blur-3xl" />
+        <div className="absolute bottom-[-12%] left-8 h-72 w-72 rounded-full bg-gradient-to-br from-[#F2D6C1] to-[#E2B992] opacity-30 blur-3xl" />
+        <div className="absolute right-10 top-1/3 h-64 w-64 rounded-full bg-gradient-to-br from-[#E2D2BE] to-[#B08B62] opacity-30 blur-3xl" />
       </div>
 
-      {/* Filters */}
-      <div className="no-print grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
-        <div className="flex items-center gap-2">
-          <label className="text-sm text-slate-600 w-16">From</label>
+      <div className="max-w-7xl mx-auto py-6 px-6 md:px-12">
+        <div className="flex items-center justify-between mb-4">
+          <h1 className="text-2xl font-bold">Accounting Dashboard</h1>
+          <div className="no-print flex gap-2">
+            <button
+              onClick={exportCSV}
+              className="border rounded-lg px-3 py-2 hover:bg-slate-50 cursor-pointer"
+            >
+              Export CSV
+            </button>
+            <button
+              style={{ color: 'white' }}
+              onClick={printPage}
+              className="bg-black text-white rounded-lg px-3 py-2 cursor-pointer"
+            >
+              Print
+            </button>
+          </div>
+        </div>
+
+        {/* Filters */}
+        <div className="no-print grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+          <div className="flex items-center gap-2">
+            <label className="text-sm text-slate-600 w-16">From</label>
+            <input
+              type="date"
+              value={from}
+              onChange={(e) => setFrom(e.target.value)}
+              className="border rounded-lg px-3 py-2 w-full cursor-pointer"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <label className="text-sm text-slate-600 w-16">To</label>
+            <input
+              type="date"
+              value={to}
+              onChange={(e) => setTo(e.target.value)}
+              className="border rounded-lg px-3 py-2 w-full cursor-pointer"
+            />
+          </div>
           <input
-            type="date"
-            value={from}
-            onChange={(e) => setFrom(e.target.value)}
-            className="border rounded-lg px-3 py-2 w-full cursor-pointer"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search (order id, email, item, paid/unpaid, status)…"
+            className="border rounded-lg px-3 py-2 w-full outline-none focus:ring-2 focus:ring-slate-300"
           />
         </div>
-        <div className="flex items-center gap-2">
-          <label className="text-sm text-slate-600 w-16">To</label>
-          <input
-            type="date"
-            value={to}
-            onChange={(e) => setTo(e.target.value)}
-            className="border rounded-lg px-3 py-2 w-full cursor-pointer"
-          />
+
+        {/* KPI cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+          <Card title="Sales " value={peso(sales)} subtitle="Total Sale" />
+          <Card title="Received Money" value={peso(received)} subtitle="Received Money" />
+          <Card title="Balance" value={peso(balance)} subtitle="Total in Account" />
+          <Card title="Transactions" value={txCount} subtitle={`${unpaidCount} unpaid`} />
         </div>
-        <input
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="Search (order id, email, item, paid/unpaid, status)…"
-          className="border rounded-lg px-3 py-2 w-full outline-none focus:ring-2 focus:ring-slate-300"
-        />
-      </div>
 
-      {/* KPI cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
-        <Card title="Sales " value={peso(sales)} subtitle="Total Sale" />
-        <Card title="Received Money" value={peso(received)} subtitle="Received Money" />
-        <Card title="Balance" value={peso(balance)} subtitle="Total in Account" />
-        <Card title="Transactions" value={txCount} subtitle={`${unpaidCount} unpaid`} />
-      </div>
+        {/* Dropdown / Accordion toggle */}
+        <div className="no-print mb-3">
+          <button
+            onClick={() => setShowTable((v) => !v)}
+            className="w-full sm:w-auto inline-flex items-center justify-between gap-2 border rounded-lg px-4 py-2 hover:bg-slate-50"
+            aria-expanded={showTable}
+            aria-controls="transactions-panel"
+          >
+            {showTable ? 'Hide transactions' : 'Show transactions'}
+            <span aria-hidden>{showTable ? '▲' : '▼'}</span>
+          </button>
+        </div>
 
-      {/* History / Transactions table */}
-      <div className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-slate-700">
-              <tr className="[&>th]:py-3 [&>th]:px-3 border-b border-slate-200">
-                <th className="text-left w-32">Date</th>
-                <th className="text-left w-20">Time</th>
-                <th className="text-left w-28">Order</th>
-                <th className="text-left">Customer</th>
-                <th className="text-left w-28">Status</th>
-                <th className="text-left w-24">Paid</th>
-                <th className="text-right w-32">Amount</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {loading ? (
-                <tr>
-                  <td colSpan={7} className="py-6 text-center text-slate-500">
-                    Loading…
-                  </td>
-                </tr>
-              ) : filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="py-8 text-center text-slate-500">
-                    No transactions for this filter.
-                  </td>
-                </tr>
-              ) : (
-                filtered.map((o) => {
-                  const d = new Date(o.createdAt);
-                  const date = d.toLocaleDateString('en-PH');
-                  const time = d.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' });
-                  const id = (o._id || '').toString().slice(-6).toUpperCase();
-                  const amt = calcOrderTotal(o);
-                  return (
-                    <tr key={o._id}>
-                      <td className="py-2 px-3">{date}</td>
-                      <td className="py-2 px-3">{time}</td>
-                      <td className="py-2 px-3 font-mono">#{id}</td>
-                      <td className="py-2 px-3">{o.userEmail || '—'}</td>
-                      <td className="py-2 px-3 capitalize">{o.status || '—'}</td>
-                      <td className="py-2 px-3">{o.paid ? 'PAID' : 'UNPAID'}</td>
-                      <td className="py-2 px-3 text-right font-semibold">{peso(amt)}</td>
+        {/* History / Transactions table */}
+        {showTable && (
+          <div
+            id="transactions-panel"
+            className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden"
+          >
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50 text-slate-700">
+                  <tr className="[&>th]:py-3 [&>th]:px-3 border-b border-slate-200">
+                    <th className="text-left w-32">Date</th>
+                    <th className="text-left w-20">Time</th>
+                    <th className="text-left w-28">Order</th>
+                    <th className="text-left">Customer</th>
+                    <th className="text-left w-28">Status</th>
+                    <th className="text-left w-24">Paid</th>
+                    <th className="text-right w-32">Amount</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {loading ? (
+                    <tr>
+                      <td colSpan={7} className="py-6 text-center text-slate-500">
+                        Loading…
+                      </td>
                     </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+                  ) : filtered.length === 0 ? (
+                    <tr>
+                      <td colSpan={7} className="py-8 text-center text-slate-500">
+                        No transactions for this filter.
+                      </td>
+                    </tr>
+                  ) : (
+                    filtered.map((o) => {
+                      const d = new Date(o.createdAt);
+                      const date = d.toLocaleDateString('en-PH');
+                      const time = d.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' });
+                      const id = (o._id || '').toString().slice(-6).toUpperCase();
+                      const amt = calcOrderTotal(o);
+                      return (
+                        <tr key={o._id}>
+                          <td className="py-2 px-3">{date}</td>
+                          <td className="py-2 px-3">{time}</td>
+                          <td className="py-2 px-3 font-mono">#{id}</td>
+                          <td className="py-2 px-3">{o.userEmail || '—'}</td>
+                          <td className="py-2 px-3 capitalize">{o.status || '—'}</td>
+                          <td className="py-2 px-3">{o.paid ? 'PAID' : 'UNPAID'}</td>
+                          <td className="py-2 px-3 text-right font-semibold">{peso(amt)}</td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
 
-      {/* Print styles */}
-      <style jsx global>{`
-        @media print {
-          .no-print { display: none !important; }
-          body { background: #fff !important; }
-          table { font-size: 12px; }
-        }
-      `}</style>
+        {/* Print styles */}
+        <style jsx global>{`
+          @media print {
+            .no-print { display: none !important; }
+            body { background: #fff !important; }
+            table { font-size: 12px; }
+          }
+        `}</style>
+      </div>
     </section>
   );
 }

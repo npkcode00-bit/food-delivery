@@ -3,19 +3,21 @@ export default function AddressInputs({addressProps,setAddressProp,disabled=fals
   return (
     <>
       <label>Phone</label>
-      <input
-       
-        disabled={disabled}
-        type="text"
-        placeholder="Phone number"
-        inputMode="numeric"
-        pattern="[0-9]*"
-        maxLength={11} // ← optional, set what you need
-        value={phone ?? ''}
-        onChange={(e) =>
-          setAddressProp('phone', e.target.value.replace(/\D/g, ''))
-        }
-      />
+    <input
+      type="text"
+      placeholder="9xxxxxxxxx"
+      inputMode="numeric"
+      pattern="9[0-9]{9}"                 // starts with 9, then 9 digits = 10 total
+      title="Phone must start with 9 and be 10 digits"
+      maxLength={10}
+      value={phone ?? ''}
+      onChange={(e) => {
+        const v = e.target.value.replace(/\D/g, '').slice(0, 10); // digits only, cap to 10
+        setAddressProp('phone', v);
+      }}
+    />
+
+
 
       <label>Street address</label>
       <input

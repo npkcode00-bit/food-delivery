@@ -1,3 +1,4 @@
+// components/layout/OrderViewsDemo.jsx
 'use client';
 
 import React, { useMemo, useState, useEffect } from 'react';
@@ -79,12 +80,14 @@ function Button({ children, variant = 'solid', onClick, disabled, small, style =
 
 function Card({ children }) {
   return (
-    <div style={{
-      border: '1px solid #e5e7eb',
-      borderRadius: 16,
-      boxShadow: '0 2px 10px rgba(0,0,0,0.04)',
-      background: '#fff',
-    }}>
+    <div
+      style={{
+        border: '1px solid #e5e7eb',
+        borderRadius: 16,
+        boxShadow: '0 2px 10px rgba(0,0,0,0.04)',
+        background: '#fff',
+      }}
+    >
       <div style={{ padding: 16 }}>{children}</div>
     </div>
   );
@@ -100,15 +103,17 @@ function Chip({ children, tone = 'default' }) {
   };
   const { bg, fg } = tones[tone] || tones.default;
   return (
-    <span style={{
-      display: 'inline-block',
-      padding: '4px 10px',
-      borderRadius: 999,
-      background: bg,
-      color: fg,
-      fontWeight: 600,
-      fontSize: 12,
-    }}>
+    <span
+      style={{
+        display: 'inline-block',
+        padding: '4px 10px',
+        borderRadius: 999,
+        background: bg,
+        color: fg,
+        fontWeight: 600,
+        fontSize: 12,
+      }}
+    >
       {children}
     </span>
   );
@@ -117,14 +122,30 @@ function Chip({ children, tone = 'default' }) {
 function Modal({ open, onClose, title, children }) {
   if (!open) return null;
   return (
-    <div style={{
-      position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.4)',
-      display: 'grid', placeItems: 'center', zIndex: 50,
-    }}>
+    <div
+      style={{
+        position: 'fixed',
+        inset: 0,
+        background: 'rgba(0,0,0,0.4)',
+        display: 'grid',
+        placeItems: 'center',
+        zIndex: 50,
+      }}
+    >
       <div style={{ background: '#fff', borderRadius: 16, width: 'min(640px, 92vw)', overflow: 'hidden' }}>
-        <div style={{ padding: 16, borderBottom: '1px solid #eee', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+        <div
+          style={{
+            padding: 16,
+            borderBottom: '1px solid #eee',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+          }}
+        >
           <h3 style={{ margin: 0, fontSize: 18 }}>{title}</h3>
-          <button onClick={onClose} style={{ background: 'transparent', border: 0, fontSize: 20, cursor: 'pointer', maxWidth:'30px' }}>×</button>
+          <button onClick={onClose} style={{ background: 'transparent', border: 0, fontSize: 20, cursor: 'pointer', maxWidth:'30px' }}>
+            ×
+          </button>
         </div>
         <div style={{ padding: 16, maxHeight: '70vh', overflow: 'auto' }}>{children}</div>
       </div>
@@ -151,12 +172,16 @@ function StatusStepper({ status }) {
           <div
             title={STATUS_META[s].label}
             style={{
-              width: 32, height: 32, borderRadius: 999,
-              display: 'grid', placeItems: 'center',
+              width: 32,
+              height: 32,
+              borderRadius: 999,
+              display: 'grid',
+              placeItems: 'center',
               background: i <= active ? '#111' : '#fff',
               color: i <= active ? '#fff' : '#64748b',
               border: '1px solid ' + (i <= active ? '#111' : '#cbd5e1'),
-              fontSize: 12, fontWeight: 700,
+              fontSize: 12,
+              fontWeight: 700,
             }}
           >
             {i + 1}
@@ -255,10 +280,15 @@ function OrderDetails({ order }) {
         <div style={{ fontSize: 12, color: '#64748b', marginBottom: 6 }}>Items</div>
         <div style={{ border: '1px solid #e5e7eb', borderRadius: 12, overflow: 'hidden' }}>
           {orderItems.map((it) => (
-            <div key={it.id} style={{ display: 'flex', justifyContent: 'space-between', padding: 12, borderBottom: '1px solid #e5e7eb' }}>
+            <div
+              key={it.id}
+              style={{ display: 'flex', justifyContent: 'space-between', padding: 12, borderBottom: '1px solid #e5e7eb' }}
+            >
               <div>
                 <div style={{ fontWeight: 600 }}>{it.name}</div>
-                <div style={{ fontSize: 12, color: '#64748b' }}>Qty: {it.qty} × {currency(it.price)}</div>
+                <div style={{ fontSize: 12, color: '#64748b' }}>
+                  Qty: {it.qty} × {currency(it.price)}
+                </div>
               </div>
               <div style={{ fontWeight: 700 }}>{currency(it.qty * it.price)}</div>
             </div>
@@ -302,34 +332,40 @@ function AdminActions({ order, onChange, onRefresh, onDelete, canDelete }) {
 
   const handleDelete = async () => {
     const displayId = order._id?.slice(-6).toUpperCase() || order.id;
-    toast((t) => (
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        <div>Delete order #{displayId}? This cannot be undone.</div>
-        <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
-          <button onClick={() => toast.dismiss(t.id)} style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#fff', cursor: 'pointer', fontWeight: 600 }}>
-            Cancel
-          </button>
-          <button
-            onClick={async () => {
-              toast.dismiss(t.id);
-              setLoading('delete');
-              const res = await deleteOrder(order._id);
-              setLoading(null);
-              if (res.ok) {
-                toast.success('Order deleted');
-                onDelete?.(order._id);
-                onRefresh?.();
-              } else {
-                toast.error(res.error || 'Failed to delete order');
-              }
-            }}
-            style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #991b1b', background: '#991b1b', color: '#fff', cursor: 'pointer', fontWeight: 600 }}
-          >
-            Delete
-          </button>
+    toast(
+      (t) => (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div>Delete order #{displayId}? This cannot be undone.</div>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <button
+              onClick={() => toast.dismiss(t.id)}
+              style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#fff', cursor: 'pointer', fontWeight: 600 }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={async () => {
+                toast.dismiss(t.id);
+                setLoading('delete');
+                const res = await deleteOrder(order._id);
+                setLoading(null);
+                if (res.ok) {
+                  toast.success('Order deleted');
+                  onDelete?.(order._id);
+                  onRefresh?.();
+                } else {
+                  toast.error(res.error || 'Failed to delete order');
+                }
+              }}
+              style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #991b1b', background: '#991b1b', color: '#fff', cursor: 'pointer', fontWeight: 600 }}
+            >
+              Delete
+            </button>
+          </div>
         </div>
-      </div>
-    ), { duration: 10000, style: { minWidth: 350 } });
+      ),
+      { duration: 10000, style: { minWidth: 350 } }
+    );
   };
 
   return (
@@ -393,7 +429,6 @@ function OrderCard({ initialOrder, role, canDelete, onRefresh, onDelete }) {
         )}
       </div>
 
-      {/* Modal wiring (one per card) */}
       <ModalWrapper order={order} />
     </Card>
   );
@@ -416,7 +451,7 @@ function ModalWrapper({ order }) {
   );
 }
 
-/* -------------------- Main Component -------------------- */
+/* -------------------- Main Component (with sidebar) -------------------- */
 export default function OrderViewsDemo({ orders = [], onOrderUpdate }) {
   const { data: session } = useSession();
 
@@ -424,42 +459,48 @@ export default function OrderViewsDemo({ orders = [], onOrderUpdate }) {
   const userIsCashier = session?.user?.role === 'cashier' || session?.user?.cashier === true;
   const userIsStaff   = userIsAdmin || userIsCashier;
 
-  const [role, setRole] = useState('customer'); // UI mode toggle (customer/admin)
+  const [role, setRole] = useState('customer');
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState('placed'); // default filter
 
+  // counts per status
+  const counts = useMemo(() => {
+    const map = { placed: 0, in_kitchen: 0, on_the_way: 0, delivered: 0, cancelled: 0 };
+    for (const o of orders) {
+      if (map[o.status] !== undefined) map[o.status] += 1;
+    }
+    return map;
+  }, [orders]);
+
+  // text search + status filter
   const filteredOrders = orders.filter(order => {
+    if (statusFilter !== 'all' && order.status !== statusFilter) return false;
+
     if (!search) return true;
     const s = search.toLowerCase().trim();
 
-    // ID
     const orderId = order._id?.slice(-6).toUpperCase() || '';
     if (orderId.includes(s.toUpperCase())) return true;
 
-    // Phone
     if (order.phone?.includes(search)) return true;
-
-    // Email
     if (order.userEmail?.toLowerCase().includes(s)) return true;
 
-    // Date
     const dt = new Date(order.createdAt);
     const long = dt.toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' }).toLowerCase();
     const short = dt.toLocaleDateString('en-US').toLowerCase();
     if (long.includes(s) || short.includes(s)) return true;
 
-    // Status
     const statusMap = {
-      'placed': ['placed', 'new', 'pending'],
-      'in_kitchen': ['kitchen', 'cooking', 'preparing'],
-      'on_the_way': ['way', 'delivery', 'delivering', 'transit'],
-      'delivered': ['delivered', 'complete', 'completed'],
-      'cancelled': ['cancelled', 'canceled', 'cancel'],
+      placed: ['placed', 'new', 'pending'],
+      in_kitchen: ['kitchen', 'cooking', 'preparing'],
+      on_the_way: ['way', 'delivery', 'delivering', 'transit'],
+      delivered: ['delivered', 'complete', 'completed'],
+      cancelled: ['cancelled', 'canceled', 'cancel'],
     };
     for (const [st, kws] of Object.entries(statusMap)) {
       if (order.status === st && kws.some(k => k.includes(s))) return true;
     }
 
-    // Items
     if (order.cartProducts && Array.isArray(order.cartProducts)) {
       const match = order.cartProducts.some(item => {
         if (item.name?.toLowerCase().includes(s)) return true;
@@ -488,45 +529,146 @@ export default function OrderViewsDemo({ orders = [], onOrderUpdate }) {
     );
   }
 
-  return (
-    <div style={{ padding: 16, display: 'grid', gap: 12 }} className='max-w-7xl mx-auto'>
-      {/* Search & view mode */}
-      <div style={{
-        display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap',
-        padding: 16, background: '#f8fafc', borderRadius: 16, border: '1px solid #e5e7eb',
-      }}>
-        <input
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search by ID, date, items, status..."
-          style={{
-            flex: 1, minWidth: 280, padding: '10px 12px',
-            border: '1px solid #cbd5e1', borderRadius: 12, outline: 'none', fontSize: 14,
-          }}
-        />
-        {userIsStaff && (
-          <div style={{ display: 'flex', gap: 8 }}>
-            <Button variant={role === 'customer' ? 'solid' : 'outline'} onClick={() => setRole('customer')}>
-              Customer view
-            </Button>
-            <Button variant={role === 'admin' ? 'solid' : 'outline'} onClick={() => setRole('admin')}>
-              Admin view
-            </Button>
-          </div>
-        )}
-      </div>
+  const FILTERS = [
+    { key: 'placed',     label: STATUS_META.placed.label },
+    { key: 'in_kitchen', label: STATUS_META.in_kitchen.label },
+    { key: 'on_the_way', label: STATUS_META.on_the_way.label },
+    { key: 'delivered',  label: STATUS_META.delivered.label },
+  ];
 
-      {/* List */}
-      {filteredOrders.map((order) => (
-        <OrderCard
-          key={order._id}
-          initialOrder={order}
-          role={userIsStaff ? role : 'customer'}
-          canDelete={userIsAdmin}        // cashier cannot delete
-          onRefresh={onOrderUpdate}
-          onDelete={() => onOrderUpdate()}
-        />
-      ))}
+  return (
+    <div className="max-w-7xl mx-auto px-2 md:px-0" style={{ paddingTop: 16, paddingBottom: 16 }}>
+      <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+        {/* Sidebar */}
+        <aside className="md:col-span-3">
+          {/* Mobile dropdown */}
+          <div className="md:hidden mb-4">
+            <select
+              className="w-full rounded-xl border border-[#B08B62]/60 bg-white/80 px-4 py-2 text-zinc-700 backdrop-blur-md focus:outline-none focus:ring-2 focus:ring-[#8B5E34]/60"
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+            >
+              {FILTERS.map(f => (
+                <option key={f.key} value={f.key}>
+                  {f.label} ({counts[f.key] || 0})
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Desktop list */}
+          <div className="hidden md:block sticky top-6">
+            <div className="rounded-2xl border border-white/30 bg-white/60 p-3 backdrop-blur-xl">
+              <h3 className="px-2 pb-2 text-sm font-semibold uppercase tracking-wide text-zinc-600">
+                Status
+              </h3>
+              <ul className="space-y-1">
+                {FILTERS.map(f => {
+                  const active = statusFilter === f.key;
+                  const count = counts[f.key] || 0;
+
+                  return (
+                    <li key={f.key}>
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => setStatusFilter(f.key)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            setStatusFilter(f.key);
+                          }
+                        }}
+                        className={[
+                          'block w-full select-none text-left rounded-xl px-3 py-3 outline-none transition cursor-pointer',
+                          'focus-visible:ring-2 focus-visible:ring-[#8B5E34]/50',
+                          active
+                            ? 'bg-gradient-to-r from-[#A5724A] to-[#7A4E2A] text-white shadow-lg shadow-[#A5724A]/25'
+                            : 'text-zinc-700 hover:bg-white/80',
+                        ].join(' ')}
+                        aria-pressed={active}
+                      >
+                        <div className="flex items-center justify-between">
+                          <span>{f.label}</span>
+                          <span className={active ? 'opacity-90' : 'text-zinc-500'}>
+                            {count}
+                          </span>
+                        </div>
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          </div>
+        </aside>
+
+        {/* Main column */}
+        <main className="md:col-span-9">
+          {/* Search & view mode bar */}
+          <div
+            style={{
+              display: 'flex',
+              gap: 8,
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              padding: 16,
+              background: '#f8fafc',
+              borderRadius: 16,
+              border: '1px solid #e5e7eb',
+              marginBottom: 12,
+            }}
+          >
+            <input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search by ID, date, items, status..."
+              style={{
+                flex: 1,
+                minWidth: 280,
+                padding: '10px 12px',
+                border: '1px solid #cbd5e1',
+                borderRadius: 12,
+                outline: 'none',
+                fontSize: 14,
+              }}
+            />
+
+            {userIsStaff && (
+              <div style={{ display: 'flex', gap: 8 }}>
+                <Button variant={role === 'customer' ? 'solid' : 'outline'} onClick={() => setRole('customer')}>
+                  Customer view
+                </Button>
+                <Button variant={role === 'admin' ? 'solid' : 'outline'} onClick={() => setRole('admin')}>
+                  Admin view
+                </Button>
+              </div>
+            )}
+          </div>
+
+          {/* Orders list */}
+          <div style={{ display: 'grid', gap: 12 }}>
+            {filteredOrders.length > 0 ? (
+              filteredOrders.map((order) => (
+                <OrderCard
+                  key={order._id}
+                  initialOrder={order}
+                  role={userIsStaff ? role : 'customer'}
+                  canDelete={userIsAdmin}
+                  onRefresh={onOrderUpdate}
+                  onDelete={() => onOrderUpdate()}
+                />
+              ))
+            ) : (
+              <Card>
+                <div style={{ padding: 24, textAlign: 'center', color: '#64748b' }}>
+                  No orders in this status.
+                </div>
+              </Card>
+            )}
+          </div>
+        </main>
+      </div>
     </div>
   );
 }

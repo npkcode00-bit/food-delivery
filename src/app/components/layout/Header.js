@@ -94,8 +94,21 @@ export default function Header() {
   const canSeeInventory = isAdmin || role === 'cashier';
   const canSeeAccounting = isAdmin || isAccounting;
 
+  // Build nav items with the original conditions, then sort alphabetically by label.
+  const navItems = [
+    { label: 'Accounting', href: '/accounting', show: canSeeAccounting },
+    { label: 'Home', href: '/', show: showHome },
+    { label: 'Inventory', href: '/inventory', show: canSeeInventory },
+    { label: 'Items', href: '/admin', show: isAdmin },
+    { label: 'Menu', href: '/menu', show: user?.role !== 'cashier' },
+    { label: 'Orders', href: '/orders', show: isAuthed },
+    { label: 'Users', href: '/users', show: isAdmin },
+  ]
+    .filter(i => i.show)
+    .sort((a, b) => a.label.localeCompare(b.label));
+
   return (
-    <header  className="border-b bg-white">
+    <header className="border-b bg-transparent">
       <div className=" mx-auto px-4 sm:px-6 lg:px-8 py-3 md:py-4">
         {/* Top bar (logo + toggles) - mobile */}
         <div className="flex items-center md:hidden justify-between gap-3">
@@ -116,80 +129,16 @@ export default function Header() {
         {/* Mobile nav drawer */}
         {mobileNavOpen && (
           <div className="md:hidden mt-2 rounded-xl border bg-white shadow-lg p-4 flex flex-col gap-2 text-center">
-            {/* Home visible to guests and customers */}
-            {showHome && (
+            {navItems.map(item => (
               <Link
-                href="/"
+                key={item.href}
+                href={item.href}
                 className="py-2 rounded-lg hover:bg-gray-50 cursor-pointer"
                 onClick={() => setMobileNavOpen(false)}
               >
-                Home
+                {item.label}
               </Link>
-            )}
-
-            {/* Orders visible to any authenticated user */}
-            {isAuthed && (
-              <Link
-                href="/orders"
-                className="py-2 rounded-lg hover:bg-gray-50 cursor-pointer"
-                onClick={() => setMobileNavOpen(false)}
-              >
-                Orders
-              </Link>
-            )}
-
-            {/* Accounting (admin + accounting only) */}
-            {canSeeAccounting && (
-              <Link
-                href="/accounting"
-                className="py-2 rounded-lg hover:bg-gray-50 cursor-pointer"
-                onClick={() => setMobileNavOpen(false)}
-              >
-                Accounting
-              </Link>
-            )}
-
-            {/* Admin links */}
-            {isAdmin && (
-              <Link
-                href="/admin"
-                className="py-2 rounded-lg hover:bg-gray-50 cursor-pointer"
-                onClick={() => setMobileNavOpen(false)}
-              >
-                Items
-              </Link>
-            )}
-            {isAdmin && (
-              <Link
-                href="/users"
-                className="py-2 rounded-lg hover:bg-gray-50 cursor-pointer"
-                onClick={() => setMobileNavOpen(false)}
-              >
-                Users
-              </Link>
-            )}
-
-            {/* Show Menu only when user.role is NOT cashier */}
-            {user?.role !== 'cashier' && (
-              <Link
-                href="/menu"
-                className="py-2 rounded-lg hover:bg-gray-50 cursor-pointer"
-                onClick={() => setMobileNavOpen(false)}
-              >
-                Menu
-              </Link>
-            )}
-
-            {/* Inventory: admin + cashier */}
-            {canSeeInventory && (
-              <Link
-                href="/inventory"
-                className="py-2 rounded-lg hover:bg-gray-50 cursor-pointer"
-                onClick={() => setMobileNavOpen(false)}
-              >
-                Inventory
-              </Link>
-            )}
+            ))}
 
             {/* Auth */}
             <div className="pt-2 border-t mt-2">
@@ -207,52 +156,11 @@ export default function Header() {
           <nav className="flex items-center gap-6 text-gray-600 font-semibold">
             <img src="/logo.png" alt="Logo" className="w-56 lg:w-72 max-w-full h-auto" />
 
-            {/* Home visible to guests and customers */}
-            {showHome && (
-              <Link href="/" className="hover:text-black cursor-pointer">
-                Home
+            {navItems.map(item => (
+              <Link key={item.href} href={item.href} className="hover:text-black cursor-pointer">
+                {item.label}
               </Link>
-            )}
-
-            {/* Orders visible to any authenticated user */}
-            {isAuthed && (
-              <Link href="/orders" className="hover:text-black cursor-pointer">
-                Orders
-              </Link>
-            )}
-
-            {/* Accounting (admin + accounting only) */}
-            {canSeeAccounting && (
-              <Link href="/accounting" className="hover:text-black cursor-pointer">
-                Accounting
-              </Link>
-            )}
-
-            {/* Admin links */}
-            {isAdmin && (
-              <Link href="/admin" className="hover:text-black cursor-pointer">
-                Items
-              </Link>
-            )}
-            {isAdmin && (
-              <Link href="/users" className="hover:text-black cursor-pointer">
-                Users
-              </Link>
-            )}
-
-            {/* Show Menu only when NOT cashier */}
-            {user?.role !== 'cashier' && (
-              <Link href="/menu" className="hover:text-black cursor-pointer">
-                Menu
-              </Link>
-            )}
-
-            {/* Inventory: admin + cashier */}
-            {canSeeInventory && (
-              <Link href="/inventory" className="hover:text-black cursor-pointer">
-                Inventory
-              </Link>
-            )}
+            ))}
           </nav>
 
           <nav className="flex items-center gap-4 text-gray-600 font-semibold">

@@ -6,7 +6,10 @@ import AddToCartButton from './AddToCartButton';
 
 export default function MenuItemTile({ onAddToCart, ...item }) {
   const { data: session, status } = useSession();
-  const isAuthed = status === 'authenticated';
+
+  // Only customers
+  const role = session?.user?.role; // 'customer' | 'admin' | 'accounting' | 'cashier' | undefined
+  const isCustomer = status === 'authenticated' && role === 'customer';
 
   const {
     image,
@@ -29,7 +32,7 @@ export default function MenuItemTile({ onAddToCart, ...item }) {
       <div className="text-center">
         <img
           src={image}
-          className="max-h-auto max-h-24 block mx-auto"
+          className="max-h-24 block mx-auto"
           alt={name || 'menu item'}
         />
       </div>
@@ -38,17 +41,15 @@ export default function MenuItemTile({ onAddToCart, ...item }) {
 
       <p className="text-gray-500 text-sm line-clamp-3">{description}</p>
 
-      {/* Only render add-to-cart when logged in; otherwise prompt to login */}
-      {isAuthed ? (
+      {/* Only authenticated customers see Add to cart */}
+      {isCustomer ? (
         <AddToCartButton
           image={image}
           hasSizesOrExtras={hasSizesOrExtras}
           onClick={onAddToCart}
           basePrice={basePrice}
         />
-      ) : (
-        <></>
-      )}
+      ) : null}
     </div>
   );
 }
