@@ -23,7 +23,7 @@ export default function HomeMenu() {
         <div className="absolute bottom-[-16%] left-8 h-64 w-64 rounded-full bg-gradient-to-br from-rose-400 to-orange-300 opacity-20 blur-3xl" />
       </div>
 
-      <div className="max-x-6xl px-2 md:px-4">
+      <div className="px-2 md:px-4">
         <div className="mb-6 text-center md:mb-8">
           <SectionHeaders subHeader="check out" mainHeader="Our Best Sellers" />
         </div>

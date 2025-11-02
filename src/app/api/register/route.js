@@ -1,5 +1,7 @@
 import mongoose from 'mongoose';
 import { User } from '../../models/User';
+import { PendingUser } from '../../models/PendingUser';
+import { generateOTP, sendOTPEmail } from '../lib/emailService.js';
 
 export const runtime = 'nodejs';
 
@@ -9,32 +11,26 @@ async function dbConnect() {
 }
 
 function isValidPhone(str) {
-  // simple: allow +, digits, spaces, dashes, parentheses; length >= 6
   return /^[+\d][\d\s\-()]{5,}$/.test(str || '');
 }
 
 export async function POST(req) {
   try {
     const body = await req.json();
-    const {
-      email,
-      password,
-      firstName,
-      lastName,
-      address,
-      phone,
-      // NOTE: we ignore any incoming role from client for safety
-    } = body || {};
+    const { email, password, firstName, lastName, address, phone } = body || {};
 
     if (!email || !password || !firstName || !lastName || !address || !phone) {
       return Response.json(
-        { message: 'Email, password, first name, last name, address, and phone are required.' },
+        { message: 'All fields are required.' },
         { status: 400 }
       );
     }
 
     if (password.length < 5) {
-      return Response.json({ message: 'Password must be at least 5 characters.' }, { status: 400 });
+      return Response.json(
+        { message: 'Password must be at least 5 characters.' },
+        { status: 400 }
+      );
     }
 
     const fn = String(firstName).trim();
@@ -43,55 +39,78 @@ export async function POST(req) {
     const ph = String(phone).trim();
 
     if (fn.length < 2 || ln.length < 2) {
-      return Response.json({ message: 'Please provide a valid first and last name.' }, { status: 400 });
+      return Response.json(
+        { message: 'Please provide a valid first and last name.' },
+        { status: 400 }
+      );
     }
     if (addr.length < 5) {
-      return Response.json({ message: 'Please provide a valid address.' }, { status: 400 });
+      return Response.json(
+        { message: 'Please provide a valid address.' },
+        { status: 400 }
+      );
     }
     if (!isValidPhone(ph)) {
-      return Response.json({ message: 'Please provide a valid phone number.' }, { status: 400 });
+      return Response.json(
+        { message: 'Please provide a valid phone number.' },
+        { status: 400 }
+      );
     }
 
     await dbConnect();
 
     const normalizedEmail = String(email).toLowerCase().trim();
 
+    // Check if user already exists
     const exists = await User.findOne({ email: normalizedEmail }).lean();
     if (exists) {
-      return Response.json({ message: 'Email already registered.' }, { status: 409 });
+      return Response.json(
+        { message: 'Email already registered.' },
+        { status: 409 }
+      );
     }
 
-    // Create user. Role is auto-populated to 'customer' by default.
-    const createdUser = await User.create({
+    // Generate OTP
+    const otp = generateOTP();
+    const otpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+
+    // Delete any existing pending registration for this email
+    await PendingUser.deleteOne({ email: normalizedEmail });
+
+    // Store pending registration
+    await PendingUser.create({
       email: normalizedEmail,
       password,
       firstName: fn,
       lastName: ln,
       address: addr,
       phone: ph,
-      // role is omitted on purpose so schema default applies
-      // admin will auto-sync via pre('save') if role changes
+      otp,
+      otpExpiry,
     });
+
+    // Send OTP email
+    const emailResult = await sendOTPEmail(normalizedEmail, otp, fn);
+    
+    if (!emailResult.success) {
+      return Response.json(
+        { message: 'Failed to send verification email. Please try again.' },
+        { status: 500 }
+      );
+    }
 
     return Response.json(
       {
-        _id: createdUser._id,
-        email: createdUser.email,
-        firstName: createdUser.firstName,
-        lastName: createdUser.lastName,
-        address: createdUser.address,
-        phone: createdUser.phone,
-        role: createdUser.role,      // <-- return role
-        admin: createdUser.admin,    // <-- return admin for completeness
-        message: 'User created.',
+        message: 'Verification code sent to your email.',
+        email: normalizedEmail,
       },
-      { status: 201 }
+      { status: 200 }
     );
   } catch (err) {
-    if (err?.code === 11000 && (err?.keyPattern?.email || err?.keyValue?.email)) {
-      return Response.json({ message: 'Email already registered.' }, { status: 409 });
-    }
-    console.error(err);
-    return Response.json({ message: 'Registration failed.' }, { status: 500 });
+    console.error('Registration error:', err);
+    return Response.json(
+      { message: 'Registration failed. Please try again.' },
+      { status: 500 }
+    );
   }
 }

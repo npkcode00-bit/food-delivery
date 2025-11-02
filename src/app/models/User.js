@@ -6,17 +6,17 @@ const UserSchema = new Schema(
     email: {
       type: String,
       required: true,
-      unique: true,   // unique index at DB level
+      unique: true,
       lowercase: true,
       trim: true,
       index: true,
     },
     password: {
       type: String,
-      required: true, // DO NOT set unique here
+      required: true,
     },
 
-    // Profile fields (from previous step)
+    // Profile fields
     firstName: {
       type: String,
       required: true,
@@ -41,16 +41,21 @@ const UserSchema = new Schema(
       trim: true,
     },
 
-    // NEW: role with default
+    // Role management
     role: {
       type: String,
       enum: ['customer', 'admin', 'accounting', 'cashier'],
       default: 'customer',
       index: true,
     },
-
-    // Keep existing boolean for compatibility, auto-sync with role
     admin: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+
+    // ✅ NEW: Email verification status
+    isEmailVerified: {
       type: Boolean,
       default: false,
       index: true,
@@ -59,10 +64,10 @@ const UserSchema = new Schema(
   { timestamps: true }
 );
 
-// Ensure the unique index is created (helps in prod)
+// Ensure unique index
 UserSchema.index({ email: 1 }, { unique: true });
 
-// Optional convenience virtual
+// Virtual for full name
 UserSchema.virtual('fullName').get(function () {
   return [this.firstName, this.lastName].filter(Boolean).join(' ');
 });

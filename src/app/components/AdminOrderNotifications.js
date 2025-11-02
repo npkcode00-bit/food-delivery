@@ -46,6 +46,23 @@ export default function AdminOrderNotifications() {
     return 0;
   };
 
+  // ✅ NEW: Format timestamp helper
+  const formatTime = (timestamp) => {
+    if (!timestamp) return 'Unknown';
+    try {
+      const date = new Date(timestamp);
+      return date.toLocaleString('en-PH', {
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true
+      });
+    } catch {
+      return 'Unknown';
+    }
+  };
+
   useEffect(() => {
     if (!isStaff || status !== 'authenticated') return;
 
@@ -140,6 +157,14 @@ export default function AdminOrderNotifications() {
           seenIdsRef.current = new Set(data.map(o => String(o?._id)));
 
           const placedOrders = data.filter(o => o?.status === 'placed');
+          
+          // ✅ NEW: Sort by creation date (oldest first)
+          placedOrders.sort((a, b) => {
+            const dateA = new Date(a.createdAt || 0);
+            const dateB = new Date(b.createdAt || 0);
+            return dateA - dateB; // Oldest first
+          });
+
           if (placedOrders.length > 0 && !hasShownLoginNotificationRef.current) {
             hasShownLoginNotificationRef.current = true;
 
@@ -170,6 +195,10 @@ export default function AdminOrderNotifications() {
                         </div>
                         <div style={{ fontSize: 15, marginBottom: 6, fontWeight: 600, color: '#f59e0b' }}>
                           Order #{order._id?.slice(-6).toUpperCase()}
+                        </div>
+                        {/* ✅ NEW: Show creation time */}
+                        <div style={{ fontSize: 13, color: '#64748b', marginBottom: 4, fontStyle: 'italic' }}>
+                          📅 Placed: {formatTime(order.createdAt)}
                         </div>
                         <div style={{ fontSize: 14, color: '#64748b', marginBottom: 4 }}>
                           {order.cartProducts?.length || 0} item(s)
@@ -249,6 +278,10 @@ export default function AdminOrderNotifications() {
                     </div>
                     <div style={{ fontSize: 15, marginBottom: 6, fontWeight: 600, color: '#10b981' }}>
                       Order #{latestOrder._id?.slice(-6).toUpperCase()}
+                    </div>
+                    {/* ✅ NEW: Show creation time for new orders too */}
+                    <div style={{ fontSize: 13, color: '#64748b', marginBottom: 4, fontStyle: 'italic' }}>
+                      📅 Placed: {formatTime(latestOrder.createdAt)}
                     </div>
                     <div style={{ fontSize: 14, color: '#64748b', marginBottom: 4 }}>
                       {latestOrder.cartProducts?.length || 0} item(s)
