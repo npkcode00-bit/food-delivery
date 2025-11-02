@@ -1,55 +1,75 @@
-import { model, models, Schema } from "mongoose";
+// models/Order.js
+import mongoose from 'mongoose';
 
-const CartProductSchema = new Schema({
-  _id: String,
-  name: String,
-  basePrice: Number,
-  size: {
-    _id: String,
-    name: String,
-    price: Number,
+const PaymentInfoSchema = new mongoose.Schema(
+  {
+    provider: String,             // e.g., 'paymongo'
+    intentId: String,             // CheckoutIntent _id as string
+    checkoutSessionId: String,    // PayMongo session id
   },
-  extras: [{
-    _id: String,
+  { _id: false }
+);
+
+const OrderSchema = new mongoose.Schema(
+  {
+    userEmail: { type: String, required: true, index: true },
+
+    // flattened customer/contact fields
     name: String,
-    price: Number,
-  }],
-}, { _id: false });
+    phone: String,
+    streetAddress: String,
+    city: String,
+    postalCode: String,
+    country: { type: String, default: 'PH' },
 
-// NEW: keep what the webhook writes so GET /api/orders?intent=... can find it
-const PaymentInfoSchema = new Schema({
-  provider: String,           // 'paymongo'
-  type: String,               // event type
-  intentId: String,           // CheckoutIntent _id (string)
-  checkoutSessionId: String,  // cs_...
-  amount: Number,             // centavos or total from event
-  currency: String,           // 'PHP'
-}, { _id: false });
+    // persist order method on the order
+    orderMethod: {
+      type: String,
+      enum: ['pickup', 'dine_in', 'delivery'],
+      default: 'pickup',
+      index: true,
+    },
 
-const OrderSchema = new Schema({
-  userEmail: String,
-  phone: String,
-  streetAddress: String,
-  postalCode: String,
-  city: String,
-  country: String,
-  name: String,
+    cartProducts: { type: Array, required: true, default: [] },
+    totalPrice: { type: Number, required: true },
 
-  cartProducts: [CartProductSchema],
-  totalPrice: Number,
-  paid: { type: Boolean, default: false },
+    status: {
+      type: String,
+      enum: [
+        // Common statuses
+        'placed',
+        'in_kitchen',
+        'cancelled',
+        
+        // Delivery-specific
+        'on_the_way',
+        'delivered',
+        
+        // Pickup-specific
+        'ready_for_pickup',
+        'picked_up',
+        
+        // Dine-in-specific
+        'served',
+        'completed',
+      ],
+      default: 'placed',
+      index: true,
+    },
 
-  status: {
-    type: String,
-    enum: ['placed', 'in_kitchen', 'on_the_way', 'delivered', 'cancelled'],
-    default: 'placed'
+    paid: { type: Boolean, default: false, index: true },
+    paidAt: Date,
+
+    paymentInfo: PaymentInfoSchema,
+
+    notes: String,
   },
+  { timestamps: true, strict: true }
+);
 
-  // NEW: keep paymentInfo
-  paymentInfo: PaymentInfoSchema,
-}, { timestamps: true });
+// Make finalization idempotent if you want (safe with sparse)
+OrderSchema.index({ 'paymentInfo.intentId': 1 }, { unique: true, sparse: true });
+OrderSchema.index({ createdAt: -1 });
 
-// helpful for GET /api/orders?intent=...
-OrderSchema.index({ 'paymentInfo.intentId': 1 });
-
-export const Order = models?.Order || model('Order', OrderSchema);
+export const Order =
+  mongoose.models.Order || mongoose.model('Order', OrderSchema);

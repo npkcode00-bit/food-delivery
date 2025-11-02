@@ -4,8 +4,10 @@
 import { useEffect, useState, useMemo } from 'react';
 import SectionHeaders from '../components/layout/SectionHeaders';
 import MenuItem from '../components/menu/MenuItem';
+import { useSession } from 'next-auth/react';
 
 export default function MenuPage() {
+  const { data: session, status } = useSession();
   const [categories, setCategories] = useState([]);
   const [menuItems, setMenuItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -77,7 +79,15 @@ export default function MenuPage() {
         {/* Inner content */}
         <div className="px-6 py-10 md:px-12 md:py-14">
           <div className="mb-8 text-center">
-            <SectionHeaders subHeader="our menu" mainHeader="Browse by Category" />
+            {status === 'authenticated' && (
+              <SectionHeaders subHeader="our menu" mainHeader="Browse by Category" />
+            )}
+            {status === 'unauthenticated' && (
+              <SectionHeaders
+                subHeader="Feel free to browse—please sign in to place an order."
+                mainHeader="You're not logged in."
+              />
+            )}
           </div>
 
           {/* Mobile: dropdown (brown focus/border) */}

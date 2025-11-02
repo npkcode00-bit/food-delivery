@@ -1,4 +1,4 @@
-// components/layout/OrderViewsDemo.jsx
+// app/components/layout/OrderViewsDemo.jsx
 'use client';
 
 import React, { useMemo, useState, useEffect } from 'react';
@@ -6,19 +6,59 @@ import { useSession } from 'next-auth/react';
 import toast from 'react-hot-toast';
 
 /* -------------------- Constants & helpers -------------------- */
-const STATUS_FLOW = ['placed', 'in_kitchen', 'on_the_way', 'delivered'];
+
+// Dynamic status flows based on order method
+const STATUS_FLOWS = {
+  delivery: ['placed', 'in_kitchen', 'on_the_way', 'delivered'],
+  pickup: ['placed', 'in_kitchen', 'ready_for_pickup', 'picked_up'],
+  dine_in: ['placed', 'in_kitchen', 'served', 'completed'],
+};
+
 const STATUS_META = {
+  // Common statuses
   placed: { label: 'Placed' },
   in_kitchen: { label: 'In the kitchen' },
+  cancelled: { label: 'Cancelled' },
+  
+  // Delivery statuses
   on_the_way: { label: 'On the way' },
   delivered: { label: 'Delivered' },
-  cancelled: { label: 'Cancelled' },
+  
+  // Pickup statuses
+  ready_for_pickup: { label: 'Ready for pickup' },
+  picked_up: { label: 'Picked up' },
+  
+  // Dine-in statuses
+  served: { label: 'Served' },
+  completed: { label: 'Completed' },
+};
+
+const ORDER_METHOD_LABEL = {
+  pickup: 'Pick-up',
+  dine_in: 'Dine-in',
+  delivery: 'Delivery',
 };
 
 const fmtTime = (iso) =>
   new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(iso));
 
-const currency = (n) => new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD' }).format(n);
+const currency = (n) => new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(n);
+
+const getOrderMethodLabel = (m) => ORDER_METHOD_LABEL[m] || (m || '—');
+
+// Get the appropriate status flow for an order
+function getStatusFlow(orderMethod) {
+  const method = orderMethod || 'pickup';
+  return STATUS_FLOWS[method] || STATUS_FLOWS.pickup;
+}
+
+// Get next status in the flow
+function getNextStatus(currentStatus, orderMethod) {
+  const flow = getStatusFlow(orderMethod);
+  const currentIndex = flow.indexOf(currentStatus);
+  if (currentIndex === -1 || currentIndex >= flow.length - 1) return null;
+  return flow[currentIndex + 1];
+}
 
 /* -------------------- API -------------------- */
 async function updateOrderStatus(orderId, next) {
@@ -143,7 +183,7 @@ function Modal({ open, onClose, title, children }) {
           }}
         >
           <h3 style={{ margin: 0, fontSize: 18 }}>{title}</h3>
-          <button onClick={onClose} style={{ background: 'transparent', border: 0, fontSize: 20, cursor: 'pointer', maxWidth:'30px' }}>
+          <button onClick={onClose} style={{ background: 'transparent', border: 0, fontSize: 20, cursor: 'pointer', maxWidth: '30px' }}>
             ×
           </button>
         </div>
@@ -157,17 +197,28 @@ function Modal({ open, onClose, title, children }) {
 function StatusChip({ status }) {
   const tone =
     status === 'in_kitchen' ? 'warn' :
-    status === 'on_the_way' ? 'info' :
-    status === 'delivered' ? 'ok' :
+    ['on_the_way', 'ready_for_pickup', 'served'].includes(status) ? 'info' :
+    ['delivered', 'picked_up', 'completed'].includes(status) ? 'ok' :
     status === 'cancelled' ? 'danger' : 'default';
   return <Chip tone={tone}>{STATUS_META[status]?.label || status}</Chip>;
 }
 
-function StatusStepper({ status }) {
-  const active = Math.max(STATUS_FLOW.indexOf(status), 0);
+function OrderMethodChip({ method }) {
+  const label = getOrderMethodLabel(method);
+  const tone =
+    method === 'pickup'   ? 'info' :
+    method === 'dine_in'  ? 'ok' :
+    method === 'delivery' ? 'warn' : 'default';
+  return <Chip tone={tone}>{label}</Chip>;
+}
+
+function StatusStepper({ status, orderMethod }) {
+  const flow = getStatusFlow(orderMethod);
+  const active = Math.max(flow.indexOf(status), 0);
+  
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-      {STATUS_FLOW.map((s, i) => (
+      {flow.map((s, i) => (
         <div key={s} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <div
             title={STATUS_META[s].label}
@@ -186,13 +237,21 @@ function StatusStepper({ status }) {
           >
             {i + 1}
           </div>
-          {i < STATUS_FLOW.length - 1 && (
+          {i < flow.length - 1 && (
             <div style={{ width: 48, height: 2, background: i < active ? '#111' : '#e2e8f0' }} />
           )}
         </div>
       ))}
     </div>
   );
+}
+
+// Make a stable unique key for each cart line item
+function makeLineKey(item, index) {
+  const id = String(item._id || 'noid');
+  const size = String(item.size?._id || 'nosize');
+  const extras = (item.extras || []).map(e => String(e._id || e.name)).sort().join('|') || 'noextras';
+  return `${id}:${size}:${extras}:${index}`;
 }
 
 function OrderDetails({ order }) {
@@ -231,14 +290,40 @@ function OrderDetails({ order }) {
         let itemName = item.name || 'Unknown Item';
         if (item.size?.name) itemName += ` (${item.size.name})`;
         if (item.extras?.length) itemName += ` + ${item.extras.map(e => e.name).join(', ')}`;
-        return { id: item._id || index, name: itemName, qty: 1, price: itemPrice };
+
+        const lineId = makeLineKey(item, index);
+        return { id: lineId, name: itemName, qty: 1, price: itemPrice };
       });
     }
-    return order.items || [];
+    return (order.items || []).map((it, idx) => ({
+      ...it,
+      id: `${String(it.id ?? it._id ?? 'noid')}-${idx}`,
+    }));
   }, [order]);
+
+  const displayOrderMethod = order.orderMethod || 'pickup';
 
   return (
     <div style={{ display: 'grid', gap: 12 }}>
+      <div style={{ 
+        padding: 12, 
+        background: '#f8fafc', 
+        borderRadius: 12, 
+        border: '1px solid #e5e7eb',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between'
+      }}>
+        <div>
+          <div style={{ fontSize: 12, color: '#64748b', marginBottom: 4 }}>Order Method</div>
+          <div style={{ fontWeight: 700, fontSize: 16 }}>
+            {getOrderMethodLabel(displayOrderMethod)}
+            {!order.orderMethod && <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 400 }}> (not recorded)</span>}
+          </div>
+        </div>
+        <OrderMethodChip method={displayOrderMethod} />
+      </div>
+
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
         <div>
           <div style={{ fontSize: 12, color: '#64748b' }}>Order ID</div>
@@ -250,6 +335,7 @@ function OrderDetails({ order }) {
           <div style={{ fontSize: 12, color: '#64748b' }}>Placed</div>
           <div>{fmtTime(order.createdAt)}</div>
         </div>
+
         {order.userEmail && (
           <div style={{ gridColumn: '1 / -1' }}>
             <div style={{ fontSize: 12, color: '#64748b' }}>Email</div>
@@ -262,12 +348,16 @@ function OrderDetails({ order }) {
             <div>{order.phone}</div>
           </div>
         )}
+        
         {deliveryAddress && (
           <div style={{ gridColumn: '1 / -1' }}>
-            <div style={{ fontSize: 12, color: '#64748b' }}>Delivery address</div>
+            <div style={{ fontSize: 12, color: '#64748b' }}>
+              {displayOrderMethod === 'delivery' ? 'Delivery Address' : 'Address'}
+            </div>
             <div>{deliveryAddress}</div>
           </div>
         )}
+        
         <div style={{ gridColumn: '1 / -1' }}>
           <div style={{ fontSize: 12, color: '#64748b' }}>Payment Status</div>
           <div>{order.paid ? '✅ Paid' : '⏳ Pending'}</div>
@@ -279,9 +369,9 @@ function OrderDetails({ order }) {
       <div>
         <div style={{ fontSize: 12, color: '#64748b', marginBottom: 6 }}>Items</div>
         <div style={{ border: '1px solid #e5e7eb', borderRadius: 12, overflow: 'hidden' }}>
-          {orderItems.map((it) => (
+          {orderItems.map((it, idx) => (
             <div
-              key={it.id}
+              key={`${it.id}-${idx}`}
               style={{ display: 'flex', justifyContent: 'space-between', padding: 12, borderBottom: '1px solid #e5e7eb' }}
             >
               <div>
@@ -314,9 +404,28 @@ function OrderDetails({ order }) {
 
 function AdminActions({ order, onChange, onRefresh, onDelete, canDelete }) {
   const [loading, setLoading] = useState(null);
-  const canKitchen = order.status === 'placed';
-  const canOnTheWay = order.status === 'in_kitchen';
-  const canDeliver = order.status === 'on_the_way';
+  const orderMethod = order.orderMethod || 'pickup';
+  const flow = getStatusFlow(orderMethod);
+  
+  // Get button labels based on order method
+  const getButtonConfig = () => {
+    const currentIndex = flow.indexOf(order.status);
+    const buttons = [];
+    
+    for (let i = currentIndex + 1; i < flow.length; i++) {
+      const nextStatus = flow[i];
+      const meta = STATUS_META[nextStatus];
+      buttons.push({
+        status: nextStatus,
+        label: meta?.label || nextStatus,
+        variant: i === currentIndex + 1 ? 'solid' : i === currentIndex + 2 ? 'outline' : 'ghost'
+      });
+    }
+    
+    return buttons;
+  };
+
+  const buttons = getButtonConfig();
 
   const go = async (next) => {
     setLoading(next);
@@ -370,15 +479,16 @@ function AdminActions({ order, onChange, onRefresh, onDelete, canDelete }) {
 
   return (
     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-      <Button disabled={!canKitchen || !!loading} onClick={() => go('in_kitchen')}>
-        {loading === 'in_kitchen' ? 'Updating…' : 'In the kitchen'}
-      </Button>
-      <Button variant="outline" disabled={!canOnTheWay || !!loading} onClick={() => go('on_the_way')}>
-        {loading === 'on_the_way' ? 'Updating…' : 'On the way'}
-      </Button>
-      <Button variant="ghost" disabled={!canDeliver || !!loading} onClick={() => go('delivered')}>
-        {loading === 'delivered' ? 'Updating…' : 'Mark delivered'}
-      </Button>
+      {buttons.map((btn) => (
+        <Button
+          key={btn.status}
+          variant={btn.variant}
+          disabled={!!loading}
+          onClick={() => go(btn.status)}
+        >
+          {loading === btn.status ? 'Updating…' : btn.label}
+        </Button>
+      ))}
 
       {canDelete && (
         <Button
@@ -399,6 +509,7 @@ function OrderCard({ initialOrder, role, canDelete, onRefresh, onDelete }) {
   const [order, setOrder] = useState(initialOrder);
   useEffect(() => { setOrder(initialOrder); }, [initialOrder]);
   const displayOrderId = order._id?.slice(-6).toUpperCase() || order.id || 'N/A';
+  const displayOrderMethod = order.orderMethod || 'pickup';
 
   return (
     <Card>
@@ -407,11 +518,14 @@ function OrderCard({ initialOrder, role, canDelete, onRefresh, onDelete }) {
           <div style={{ fontSize: 18, fontWeight: 700 }}>Order #{displayOrderId}</div>
           <div style={{ fontSize: 13, color: '#64748b' }}>Placed {fmtTime(order.createdAt)}</div>
         </div>
-        <StatusChip status={order.status || 'placed'} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <OrderMethodChip method={displayOrderMethod} />
+          <StatusChip status={order.status || 'placed'} />
+        </div>
       </div>
 
       <div style={{ marginTop: 12 }}>
-        <StatusStepper status={order.status || 'placed'} />
+        <StatusStepper status={order.status || 'placed'} orderMethod={displayOrderMethod} />
       </div>
 
       <div style={{ display: 'flex', gap: 10, marginTop: 12, flexWrap: 'wrap' }}>
@@ -461,60 +575,98 @@ export default function OrderViewsDemo({ orders = [], onOrderUpdate }) {
 
   const [role, setRole] = useState('customer');
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('placed'); // default filter
+  const [statusFilter, setStatusFilter] = useState('placed');
 
-  // counts per status
+  // Group statuses by stage for filtering
+  const STATUS_GROUPS = {
+    placed: ['placed'],
+    in_progress: ['in_kitchen'],
+    ready_out: ['on_the_way', 'ready_for_pickup', 'served'],
+    completed: ['delivered', 'picked_up', 'completed'],
+  };
+
+  // Counts per group
   const counts = useMemo(() => {
-    const map = { placed: 0, in_kitchen: 0, on_the_way: 0, delivered: 0, cancelled: 0 };
+    const map = { 
+      placed: 0, 
+      in_progress: 0, 
+      ready_out: 0, 
+      completed: 0,
+      cancelled: 0 
+    };
+    
     for (const o of orders) {
-      if (map[o.status] !== undefined) map[o.status] += 1;
+      // Find which group this status belongs to
+      for (const [group, statuses] of Object.entries(STATUS_GROUPS)) {
+        if (statuses.includes(o.status)) {
+          map[group] += 1;
+          break;
+        }
+      }
+      // Handle cancelled separately
+      if (o.status === 'cancelled') {
+        map.cancelled += 1;
+      }
     }
+    
     return map;
   }, [orders]);
 
-  // text search + status filter
-  const filteredOrders = orders.filter(order => {
-    if (statusFilter !== 'all' && order.status !== statusFilter) return false;
+  // Text search + status filter + SORT BY OLDEST FIRST
+  const filteredOrders = orders
+    .filter(order => {
+      // Check status filter using groups
+      if (statusFilter !== 'all') {
+        const groupStatuses = STATUS_GROUPS[statusFilter] || [statusFilter];
+        if (!groupStatuses.includes(order.status)) return false;
+      }
 
-    if (!search) return true;
-    const s = search.toLowerCase().trim();
+      if (!search) return true;
+      const s = search.toLowerCase().trim();
 
-    const orderId = order._id?.slice(-6).toUpperCase() || '';
-    if (orderId.includes(s.toUpperCase())) return true;
+      const orderId = order._id?.slice(-6).toUpperCase() || '';
+      if (orderId.includes(s.toUpperCase())) return true;
 
-    if (order.phone?.includes(search)) return true;
-    if (order.userEmail?.toLowerCase().includes(s)) return true;
+      if (order.phone?.includes(search)) return true;
+      if (order.userEmail?.toLowerCase().includes(s)) return true;
 
-    const dt = new Date(order.createdAt);
-    const long = dt.toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' }).toLowerCase();
-    const short = dt.toLocaleDateString('en-US').toLowerCase();
-    if (long.includes(s) || short.includes(s)) return true;
+      const dt = new Date(order.createdAt);
+      const long = dt.toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' }).toLowerCase();
+      const short = dt.toLocaleDateString('en-US').toLowerCase();
+      if (long.includes(s) || short.includes(s)) return true;
 
-    const statusMap = {
-      placed: ['placed', 'new', 'pending'],
-      in_kitchen: ['kitchen', 'cooking', 'preparing'],
-      on_the_way: ['way', 'delivery', 'delivering', 'transit'],
-      delivered: ['delivered', 'complete', 'completed'],
-      cancelled: ['cancelled', 'canceled', 'cancel'],
-    };
-    for (const [st, kws] of Object.entries(statusMap)) {
-      if (order.status === st && kws.some(k => k.includes(s))) return true;
-    }
-
-    if (order.cartProducts && Array.isArray(order.cartProducts)) {
-      const match = order.cartProducts.some(item => {
-        if (item.name?.toLowerCase().includes(s)) return true;
-        if (item.size?.name?.toLowerCase().includes(s)) return true;
-        if (Array.isArray(item.extras)) {
-          return item.extras.some(e => e.name?.toLowerCase().includes(s));
+      // Search in all possible status keywords
+      const allStatusKeywords = {
+        placed: ['placed', 'new', 'pending'],
+        in_progress: ['kitchen', 'cooking', 'preparing', 'progress'],
+        ready_out: ['ready', 'way', 'delivery', 'delivering', 'transit', 'pickup', 'served', 'out'],
+        completed: ['delivered', 'picked', 'complete', 'completed', 'done', 'finished'],
+        cancelled: ['cancelled', 'canceled', 'cancel'],
+      };
+      
+      for (const [group, kws] of Object.entries(allStatusKeywords)) {
+        const groupStatuses = STATUS_GROUPS[group] || [group];
+        if (groupStatuses.includes(order.status) && kws.some(k => k.includes(s))) {
+          return true;
         }
-        return false;
-      });
-      if (match) return true;
-    }
+      }
 
-    return false;
-  });
+      if (order.cartProducts && Array.isArray(order.cartProducts)) {
+        const match = order.cartProducts.some(item => {
+          if (item.name?.toLowerCase().includes(s)) return true;
+          if (item.size?.name?.toLowerCase().includes(s)) return true;
+          if (Array.isArray(item.extras)) {
+            return item.extras.some(e => e.name?.toLowerCase().includes(s));
+          }
+          return false;
+        });
+        if (match) return true;
+      }
+
+      return false;
+    })
+    // ⭐ Sort by createdAt ASCENDING (oldest first) - FIRST ORDERS HAVE PRIORITY
+    .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
 
   if (orders.length === 0) {
     return (
@@ -530,10 +682,10 @@ export default function OrderViewsDemo({ orders = [], onOrderUpdate }) {
   }
 
   const FILTERS = [
-    { key: 'placed',     label: STATUS_META.placed.label },
-    { key: 'in_kitchen', label: STATUS_META.in_kitchen.label },
-    { key: 'on_the_way', label: STATUS_META.on_the_way.label },
-    { key: 'delivered',  label: STATUS_META.delivered.label },
+    { key: 'placed',      label: 'Placed' },
+    { key: 'in_progress', label: 'In Kitchen' },
+    { key: 'ready_out',   label: 'Ready/Out for Delivery' },
+    { key: 'completed',   label: 'Completed' },
   ];
 
   return (
@@ -541,7 +693,6 @@ export default function OrderViewsDemo({ orders = [], onOrderUpdate }) {
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
         {/* Sidebar */}
         <aside className="md:col-span-3">
-          {/* Mobile dropdown */}
           <div className="md:hidden mb-4">
             <select
               className="w-full rounded-xl border border-[#B08B62]/60 bg-white/80 px-4 py-2 text-zinc-700 backdrop-blur-md focus:outline-none focus:ring-2 focus:ring-[#8B5E34]/60"
@@ -556,7 +707,6 @@ export default function OrderViewsDemo({ orders = [], onOrderUpdate }) {
             </select>
           </div>
 
-          {/* Desktop list */}
           <div className="hidden md:block sticky top-6">
             <div className="rounded-2xl border border-white/30 bg-white/60 p-3 backdrop-blur-xl">
               <h3 className="px-2 pb-2 text-sm font-semibold uppercase tracking-wide text-zinc-600">
@@ -605,7 +755,6 @@ export default function OrderViewsDemo({ orders = [], onOrderUpdate }) {
 
         {/* Main column */}
         <main className="md:col-span-9">
-          {/* Search & view mode bar */}
           <div
             style={{
               display: 'flex',
@@ -646,7 +795,6 @@ export default function OrderViewsDemo({ orders = [], onOrderUpdate }) {
             )}
           </div>
 
-          {/* Orders list */}
           <div style={{ display: 'grid', gap: 12 }}>
             {filteredOrders.length > 0 ? (
               filteredOrders.map((order) => (

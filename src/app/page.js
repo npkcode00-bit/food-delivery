@@ -24,7 +24,7 @@ export default async function Home() {
       </div>
 
       {/* Single mac-style window */}
-      <div className="mx-auto max-w-9xl overflow-hidden rounded-2xl ">
+      <div className="mx-auto max-w-7xl overflow-hidden rounded-2xl ">
        
 
         {/* Glossy top highlight */}
