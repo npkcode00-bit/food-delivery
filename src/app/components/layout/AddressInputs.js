@@ -10,7 +10,6 @@ export default function AddressInputs({
   const {
     phone = '',
     streetAddress = '',
-    postalCode = '',
     city = '',
     country = '',
     // IMPORTANT: persist and use the same values end-to-end
@@ -86,23 +85,10 @@ export default function AddressInputs({
             onChange={(e) => setAddressProp('streetAddress', e.target.value)}
           />
 
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid  gap-2">
+           
             <div>
-              <label className="block text-sm font-medium text-zinc-700">
-                Postal code {orderMethod === 'delivery' && '*'}
-              </label>
-              <input
-                disabled={addressDisabled}
-                type="text"
-                placeholder="Postal code"
-                required={orderMethod === 'delivery'}
-                className="mt-1 mb-3 w-full rounded-lg border px-3 py-2 disabled:bg-zinc-100"
-                value={postalCode}
-                onChange={(e) => setAddressProp('postalCode', e.target.value)}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-zinc-700">
+              <label className="block w-full text-sm font-medium text-zinc-700">
                 City {orderMethod === 'delivery' && '*'}
               </label>
               <input

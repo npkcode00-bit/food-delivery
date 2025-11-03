@@ -150,7 +150,6 @@ export async function POST(req) {
           phone: intent.address?.phone || '',
           streetAddress: intent.address?.streetAddress || '',
           city: intent.address?.city || '',
-          postalCode: intent.address?.postalCode || '',
           country: intent.address?.country || 'PH',
           cartProducts: intent.cartProducts,
           totalPrice: intent.totalPrice,

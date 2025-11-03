@@ -54,20 +54,29 @@ const UserSchema = new Schema(
       index: true,
     },
 
-    // ✅ NEW: Email verification status
+    // Email verification
     isEmailVerified: {
       type: Boolean,
       default: false,
       index: true,
     },
+
+    // ✅ Password-reset OTP
+    resetOtp: {
+      type: String,
+      index: true,
+    },
+    resetOtpExpires: {
+      type: Date,
+    },
   },
   { timestamps: true }
 );
 
-// Ensure unique index
+// Unique email index
 UserSchema.index({ email: 1 }, { unique: true });
 
-// Virtual for full name
+// Virtual
 UserSchema.virtual('fullName').get(function () {
   return [this.firstName, this.lastName].filter(Boolean).join(' ');
 });
@@ -78,7 +87,6 @@ UserSchema.pre('save', async function (next) {
     const salt = await bcrypt.genSalt(10);
     this.password = await bcrypt.hash(this.password, salt);
   }
-  // Auto-sync admin flag with role
   if (this.isModified('role')) {
     this.admin = this.role === 'admin';
   }

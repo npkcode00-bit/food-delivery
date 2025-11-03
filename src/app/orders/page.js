@@ -27,9 +27,10 @@ function OrdersContent() {
     return localStorage.getItem('ordersDebug') === '1';
   }, []);
 
+  // ✅ UPDATED: Include archived orders in fetch
   const fetchOrders = async () => {
     try {
-      const res = await fetch('/api/orders', { cache: 'no-store' });
+      const res = await fetch('/api/orders?includeArchived=1', { cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
         setOrders(data);
@@ -128,7 +129,7 @@ function OrdersContent() {
             className="spinner"
             style={{
               border: '4px solid #f3f3f3',
-              borderTop: '4px solid #8B5E34', // brown accent
+              borderTop: '4px solid #8B5E34',
               borderRadius: '50%',
               width: '40px',
               height: '40px',
@@ -147,24 +148,19 @@ function OrdersContent() {
     );
   }
 
-  // ===== Wrapped with the same "blurred blobs + single rounded container" shell as Home =====
   return (
     <section className="relative">
-      {/* Soft wallpaper blobs (brown/coffee tones to match the app) */}
       <div className="pointer-events-none absolute inset-0 -z-10">
         <div className="absolute left-1/2 top-[-12%] h-80 w-80 -translate-x-1/2 rounded-full bg-gradient-to-br from-[#F3EDE2] to-[#D8C3A5] opacity-50 blur-3xl" />
         <div className="absolute bottom-[-12%] left-8 h-72 w-72 rounded-full bg-gradient-to-br from-[#F2D6C1] to-[#E2B992] opacity-30 blur-3xl" />
         <div className="absolute right-10 top-1/3 h-64 w-64 rounded-full bg-gradient-to-br from-[#E2D2BE] to-[#B08B62] opacity-30 blur-3xl" />
       </div>
 
-      {/* Single rounded container (matches home) */}
       <div className="mx-auto max-w-7xl overflow-hidden rounded-2xl">
-        {/* Glossy top highlight */}
         <div className="pointer-events-none relative">
           <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-white/50 to-transparent" />
         </div>
 
-        {/* Inner content padding */}
         <div className="px-6 py-10 md:px-12 md:py-14">
           <OrderViewsDemo orders={orders} onOrderUpdate={fetchOrders} />
         </div>

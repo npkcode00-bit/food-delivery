@@ -1,4 +1,3 @@
-// models/Order.js
 import mongoose from 'mongoose';
 
 const PaymentInfoSchema = new mongoose.Schema(
@@ -19,7 +18,6 @@ const OrderSchema = new mongoose.Schema(
     phone: String,
     streetAddress: String,
     city: String,
-    postalCode: String,
     country: { type: String, default: 'PH' },
 
     // persist order method on the order
@@ -63,6 +61,19 @@ const OrderSchema = new mongoose.Schema(
     paymentInfo: PaymentInfoSchema,
 
     notes: String,
+
+    // ✅ NEW: Archive fields
+    archived: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    archivedAt: {
+      type: Date,
+    },
+    archivedBy: {
+      type: String, // email of who archived it
+    },
   },
   { timestamps: true, strict: true }
 );

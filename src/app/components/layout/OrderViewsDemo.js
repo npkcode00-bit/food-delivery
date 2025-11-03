@@ -75,13 +75,44 @@ async function updateOrderStatus(orderId, next) {
   }
 }
 
-async function deleteOrder(orderId) {
+async function archiveOrder(orderId) {
   try {
-    const response = await fetch(`/api/orders?_id=${orderId}`, { method: 'DELETE' });
+    const response = await fetch('/api/orders', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        _id: orderId,
+        archived: true
+      }),
+    });
+    
     if (!response.ok) {
       const data = await response.json();
-      throw new Error(data.error || 'Failed to delete order');
+      throw new Error(data.error || 'Failed to archive order');
     }
+    
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, error: error.message };
+  }
+}
+
+async function unarchiveOrder(orderId) {
+  try {
+    const response = await fetch('/api/orders', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ 
+        _id: orderId,
+        archived: false
+      }),
+    });
+    
+    if (!response.ok) {
+      const data = await response.json();
+      throw new Error(data.error || 'Failed to unarchive order');
+    }
+    
     return { ok: true };
   } catch (error) {
     return { ok: false, error: error.message };
@@ -140,6 +171,7 @@ function Chip({ children, tone = 'default' }) {
     info: { bg: '#e0f2fe', fg: '#075985' },
     ok: { bg: '#dcfce7', fg: '#166534' },
     danger: { bg: '#fee2e2', fg: '#991b1b' },
+    archived: { bg: '#f3f4f6', fg: '#6b7280' },
   };
   const { bg, fg } = tones[tone] || tones.default;
   return (
@@ -194,7 +226,9 @@ function Modal({ open, onClose, title, children }) {
 }
 
 /* -------------------- Feature bits -------------------- */
-function StatusChip({ status }) {
+function StatusChip({ status, archived }) {
+  if (archived) return <Chip tone="archived">Archived</Chip>;
+  
   const tone =
     status === 'in_kitchen' ? 'warn' :
     ['on_the_way', 'ready_for_pickup', 'served'].includes(status) ? 'info' :
@@ -275,7 +309,7 @@ function OrderDetails({ order }) {
 
   const deliveryAddress = useMemo(() => {
     if (order.deliveryAddress) return order.deliveryAddress;
-    const parts = [order.streetAddress, order.city, order.postalCode, order.country].filter(Boolean);
+    const parts = [order.streetAddress, order.city, order.country].filter(Boolean);
     return parts.length > 0 ? parts.join(', ') : null;
   }, [order]);
 
@@ -305,6 +339,28 @@ function OrderDetails({ order }) {
 
   return (
     <div style={{ display: 'grid', gap: 12 }}>
+      {/* Show archived banner if order is archived */}
+      {order.archived && (
+        <div style={{ 
+          padding: 12, 
+          background: '#f3f4f6', 
+          borderRadius: 12, 
+          border: '1px solid #d1d5db',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 8
+        }}>
+          <span style={{ fontSize: 20 }}>🗄️</span>
+          <div>
+            <div style={{ fontWeight: 600, color: '#374151' }}>This order is archived</div>
+            <div style={{ fontSize: 12, color: '#6b7280' }}>
+              Archived on {new Date(order.archivedAt).toLocaleString('en-PH')}
+              {order.archivedBy && ` by ${order.archivedBy}`}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div style={{ 
         padding: 12, 
         background: '#f8fafc', 
@@ -402,10 +458,11 @@ function OrderDetails({ order }) {
   );
 }
 
-function AdminActions({ order, onChange, onRefresh, onDelete, canDelete }) {
+function AdminActions({ order, onChange, onRefresh, onArchive, canArchive }) {
   const [loading, setLoading] = useState(null);
   const orderMethod = order.orderMethod || 'pickup';
   const flow = getStatusFlow(orderMethod);
+  const isArchived = order.archived === true;
   
   // Get button labels based on order method
   const getButtonConfig = () => {
@@ -439,36 +496,114 @@ function AdminActions({ order, onChange, onRefresh, onDelete, canDelete }) {
     }
   };
 
-  const handleDelete = async () => {
+  const handleArchive = async () => {
     const displayId = order._id?.slice(-6).toUpperCase() || order.id;
     toast(
       (t) => (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          <div>Delete order #{displayId}? This cannot be undone.</div>
+          <div>
+            <div style={{ fontWeight: 600, marginBottom: 4 }}>Archive order #{displayId}?</div>
+            <div style={{ fontSize: 13, color: '#64748b' }}>
+              This order will be hidden from the main view but can be restored later.
+            </div>
+          </div>
           <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
             <button
               onClick={() => toast.dismiss(t.id)}
-              style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #e5e7eb', background: '#fff', cursor: 'pointer', fontWeight: 600 }}
+              style={{ 
+                padding: '6px 12px', 
+                borderRadius: 8, 
+                border: '1px solid #e5e7eb', 
+                background: '#fff', 
+                cursor: 'pointer', 
+                fontWeight: 600 
+              }}
             >
               Cancel
             </button>
             <button
               onClick={async () => {
                 toast.dismiss(t.id);
-                setLoading('delete');
-                const res = await deleteOrder(order._id);
+                setLoading('archive');
+                const res = await archiveOrder(order._id);
                 setLoading(null);
                 if (res.ok) {
-                  toast.success('Order deleted');
-                  onDelete?.(order._id);
+                  toast.success('Order archived successfully');
+                  onArchive?.(order._id);
                   onRefresh?.();
                 } else {
-                  toast.error(res.error || 'Failed to delete order');
+                  toast.error(res.error || 'Failed to archive order');
                 }
               }}
-              style={{ padding: '6px 12px', borderRadius: 8, border: '1px solid #991b1b', background: '#991b1b', color: '#fff', cursor: 'pointer', fontWeight: 600 }}
+              style={{ 
+                padding: '6px 12px', 
+                borderRadius: 8, 
+                border: '1px solid #f59e0b', 
+                background: '#f59e0b', 
+                color: '#fff', 
+                cursor: 'pointer', 
+                fontWeight: 600 
+              }}
             >
-              Delete
+              Archive
+            </button>
+          </div>
+        </div>
+      ),
+      { duration: 10000, style: { minWidth: 350 } }
+    );
+  };
+
+  const handleUnarchive = async () => {
+    const displayId = order._id?.slice(-6).toUpperCase() || order.id;
+    toast(
+      (t) => (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div>
+            <div style={{ fontWeight: 600, marginBottom: 4 }}>Unarchive order #{displayId}?</div>
+            <div style={{ fontSize: 13, color: '#64748b' }}>
+              This order will be restored to the main orders view.
+            </div>
+          </div>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+            <button
+              onClick={() => toast.dismiss(t.id)}
+              style={{ 
+                padding: '6px 12px', 
+                borderRadius: 8, 
+                border: '1px solid #e5e7eb', 
+                background: '#fff', 
+                cursor: 'pointer', 
+                fontWeight: 600 
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={async () => {
+                toast.dismiss(t.id);
+                setLoading('unarchive');
+                const res = await unarchiveOrder(order._id);
+                setLoading(null);
+                if (res.ok) {
+                  toast.success('Order restored successfully');
+                  onArchive?.(order._id);
+                  onRefresh?.();
+                } else {
+                  toast.error(res.error || 'Failed to restore order');
+                }
+              }}
+              style={{ 
+                padding: '6px 12px', 
+                borderRadius: 8, 
+                border: '1px solid #10b981', 
+                background: '#10b981', 
+                color: '#fff', 
+                cursor: 'pointer', 
+                fontWeight: 600 
+              }}
+            >
+              Unarchive
             </button>
           </div>
         </div>
@@ -479,7 +614,7 @@ function AdminActions({ order, onChange, onRefresh, onDelete, canDelete }) {
 
   return (
     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-      {buttons.map((btn) => (
+      {!isArchived && buttons.map((btn) => (
         <Button
           key={btn.status}
           variant={btn.variant}
@@ -490,22 +625,45 @@ function AdminActions({ order, onChange, onRefresh, onDelete, canDelete }) {
         </Button>
       ))}
 
-      {canDelete && (
-        <Button
-          variant="outline"
-          disabled={!!loading}
-          onClick={handleDelete}
-          style={{ marginLeft: 'auto', background: '#fee2e2', color: '#991b1b', borderColor: '#fca5a5' }}
-        >
-          {loading === 'delete' ? 'Deleting…' : 'Delete'}
-        </Button>
+      {canArchive && (
+        <>
+          {isArchived ? (
+            <Button
+              variant="outline"
+              disabled={!!loading}
+              onClick={handleUnarchive}
+              style={{ 
+                marginLeft: !isArchived ? 'auto' : undefined, 
+                background: '#d1fae5', 
+                color: '#065f46', 
+                borderColor: '#6ee7b7' 
+              }}
+            >
+              {loading === 'unarchive' ? 'Restoring…' : ' Unarchive'}
+            </Button>
+          ) : (
+            <Button
+              variant="outline"
+              disabled={!!loading}
+              onClick={handleArchive}
+              style={{ 
+                marginLeft: 'auto', 
+                background: '#fef3c7', 
+                color: '#92400e', 
+                borderColor: '#fcd34d' 
+              }}
+            >
+              {loading === 'archive' ? 'Archiving…' : 'Archive'}
+            </Button>
+          )}
+        </>
       )}
     </div>
   );
 }
 
 /* -------------------- Main Card -------------------- */
-function OrderCard({ initialOrder, role, canDelete, onRefresh, onDelete }) {
+function OrderCard({ initialOrder, role, canArchive, onRefresh, onArchive }) {
   const [order, setOrder] = useState(initialOrder);
   useEffect(() => { setOrder(initialOrder); }, [initialOrder]);
   const displayOrderId = order._id?.slice(-6).toUpperCase() || order.id || 'N/A';
@@ -520,13 +678,15 @@ function OrderCard({ initialOrder, role, canDelete, onRefresh, onDelete }) {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <OrderMethodChip method={displayOrderMethod} />
-          <StatusChip status={order.status || 'placed'} />
+          <StatusChip status={order.status || 'placed'} archived={order.archived} />
         </div>
       </div>
 
-      <div style={{ marginTop: 12 }}>
-        <StatusStepper status={order.status || 'placed'} orderMethod={displayOrderMethod} />
-      </div>
+      {!order.archived && (
+        <div style={{ marginTop: 12 }}>
+          <StatusStepper status={order.status || 'placed'} orderMethod={displayOrderMethod} />
+        </div>
+      )}
 
       <div style={{ display: 'flex', gap: 10, marginTop: 12, flexWrap: 'wrap' }}>
         <Button small variant="outline" onClick={() => window.dispatchEvent(new CustomEvent('open-order-modal-' + order._id))}>
@@ -537,8 +697,8 @@ function OrderCard({ initialOrder, role, canDelete, onRefresh, onDelete }) {
             order={order}
             onChange={(next) => setOrder((o) => ({ ...o, status: next }))}
             onRefresh={onRefresh}
-            onDelete={onDelete}
-            canDelete={canDelete}
+            onArchive={onArchive}
+            canArchive={canArchive}
           />
         )}
       </div>
@@ -583,6 +743,7 @@ export default function OrderViewsDemo({ orders = [], onOrderUpdate }) {
     in_progress: ['in_kitchen'],
     ready_out: ['on_the_way', 'ready_for_pickup', 'served'],
     completed: ['delivered', 'picked_up', 'completed'],
+    archived: ['archived'], // Special filter for archived
   };
 
   // Counts per group
@@ -592,13 +753,20 @@ export default function OrderViewsDemo({ orders = [], onOrderUpdate }) {
       in_progress: 0, 
       ready_out: 0, 
       completed: 0,
-      cancelled: 0 
+      cancelled: 0,
+      archived: 0 
     };
     
     for (const o of orders) {
+      // Handle archived separately
+      if (o.archived) {
+        map.archived += 1;
+        continue; // Don't count in other categories
+      }
+
       // Find which group this status belongs to
       for (const [group, statuses] of Object.entries(STATUS_GROUPS)) {
-        if (statuses.includes(o.status)) {
+        if (group !== 'archived' && statuses.includes(o.status)) {
           map[group] += 1;
           break;
         }
@@ -615,6 +783,14 @@ export default function OrderViewsDemo({ orders = [], onOrderUpdate }) {
   // Text search + status filter + SORT BY OLDEST FIRST
   const filteredOrders = orders
     .filter(order => {
+      // Handle archived filter
+      if (statusFilter === 'archived') {
+        return order.archived === true;
+      }
+
+      // Exclude archived orders from other filters
+      if (order.archived) return false;
+
       // Check status filter using groups
       if (statusFilter !== 'all') {
         const groupStatuses = STATUS_GROUPS[statusFilter] || [statusFilter];
@@ -642,6 +818,7 @@ export default function OrderViewsDemo({ orders = [], onOrderUpdate }) {
         ready_out: ['ready', 'way', 'delivery', 'delivering', 'transit', 'pickup', 'served', 'out'],
         completed: ['delivered', 'picked', 'complete', 'completed', 'done', 'finished'],
         cancelled: ['cancelled', 'canceled', 'cancel'],
+        archived: ['archived', 'archive'],
       };
       
       for (const [group, kws] of Object.entries(allStatusKeywords)) {
@@ -686,6 +863,7 @@ export default function OrderViewsDemo({ orders = [], onOrderUpdate }) {
     { key: 'in_progress', label: 'In Kitchen' },
     { key: 'ready_out',   label: 'Ready/Out for Delivery' },
     { key: 'completed',   label: 'Completed' },
+    { key: 'archived',    label: 'Archived' },
   ];
 
   return (
@@ -789,7 +967,7 @@ export default function OrderViewsDemo({ orders = [], onOrderUpdate }) {
                   Customer view
                 </Button>
                 <Button variant={role === 'admin' ? 'solid' : 'outline'} onClick={() => setRole('admin')}>
-                  Admin view
+                  Cashier view
                 </Button>
               </div>
             )}
@@ -802,15 +980,15 @@ export default function OrderViewsDemo({ orders = [], onOrderUpdate }) {
                   key={order._id}
                   initialOrder={order}
                   role={userIsStaff ? role : 'customer'}
-                  canDelete={userIsAdmin}
+                  canArchive={userIsAdmin}
                   onRefresh={onOrderUpdate}
-                  onDelete={() => onOrderUpdate()}
+                  onArchive={() => onOrderUpdate()}
                 />
               ))
             ) : (
               <Card>
                 <div style={{ padding: 24, textAlign: 'center', color: '#64748b' }}>
-                  No orders in this status.
+                  {statusFilter === 'archived' ? 'No archived orders.' : 'No orders in this status.'}
                 </div>
               </Card>
             )}

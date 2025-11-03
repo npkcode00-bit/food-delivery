@@ -104,6 +104,7 @@ export async function GET(req) {
   const { searchParams } = new URL(req.url);
   const intentId = searchParams.get('intent');
   const debug = searchParams.get('debug') === '1';
+  const includeArchived = searchParams.get('includeArchived') === '1'; // ✅ NEW: Optional param
 
   // Finalize path
   if (intentId) {
@@ -145,10 +146,9 @@ export async function GET(req) {
         phone: intent.address?.phone || '',
         streetAddress: intent.address?.streetAddress || '',
         city: intent.address?.city || '',
-        postalCode: intent.address?.postalCode || '',
         country: intent.address?.country || 'PH',
 
-        orderMethod: method, // 👈 EXPLICIT
+        orderMethod: method,
 
         cartProducts: intent.cartProducts,
         totalPrice: intent.totalPrice,
@@ -180,10 +180,12 @@ export async function GET(req) {
     }
   }
 
-  // List
-  const orders = staff
-    ? await Order.find().sort({ createdAt: -1 }).lean()
-    : await Order.find({ userEmail }).sort({ createdAt: -1 }).lean();
+  // ✅ UPDATED: List - filter out archived orders by default
+  const query = staff
+    ? (includeArchived ? {} : { archived: { $ne: true } })
+    : (includeArchived ? { userEmail } : { userEmail, archived: { $ne: true } });
+
+  const orders = await Order.find(query).sort({ createdAt: -1 }).lean();
 
   return Response.json(orders, {
     headers: {
@@ -212,18 +214,49 @@ export async function PUT(req) {
   const session = await getServerSession(authOptions);
   if (!session?.user?.email) return Response.json({ error: 'Not authenticated' }, { status: 401 });
 
-  const { orderId } = await req.json();
+  const body = await req.json();
+  
+  // ✅ NEW: Handle archive operation
+  if (body.archived !== undefined) {
+    if (!isAdmin(session)) {
+      return Response.json({ error: 'Only admins can archive orders' }, { status: 403 });
+    }
+
+    const { _id, archived } = body;
+    if (!_id) return Response.json({ error: 'Order ID is required' }, { status: 400 });
+
+    const order = await Order.findById(_id);
+    if (!order) return Response.json({ error: 'Order not found' }, { status: 404 });
+
+    order.archived = archived;
+    if (archived) {
+      order.archivedAt = new Date();
+      order.archivedBy = session.user.email;
+    } else {
+      order.archivedAt = null;
+      order.archivedBy = null;
+    }
+
+    await order.save();
+    return Response.json({ success: true, order });
+  }
+
+  // Original PUT logic for marking as paid
+  const { orderId } = body;
   if (!orderId) return Response.json({ error: 'Order ID is required' }, { status: 400 });
 
   const order = await Order.findById(orderId);
   if (!order) return Response.json({ error: 'Order not found' }, { status: 404 });
-  if (order.userEmail !== session.user.email && !isStaff(session)) return Response.json({ error: 'Unauthorized' }, { status: 403 });
+  if (order.userEmail !== session.user.email && !isStaff(session)) {
+    return Response.json({ error: 'Unauthorized' }, { status: 403 });
+  }
 
   order.paid = true;
   await order.save();
   return Response.json({ success: true, order });
 }
 
+// ✅ CHANGED: Keep DELETE but require confirmation from admin
 export async function DELETE(req) {
   await dbConnect();
   const session = await getServerSession(authOptions);
@@ -231,7 +264,14 @@ export async function DELETE(req) {
 
   const { searchParams } = new URL(req.url);
   const _id = searchParams.get('_id');
+  const confirm = searchParams.get('confirm'); // ✅ NEW: Require explicit confirmation
+  
   if (!_id) return Response.json({ error: 'Order ID is required' }, { status: 400 });
+  if (confirm !== 'true') {
+    return Response.json({ 
+      error: 'Please archive orders instead of deleting them. Delete is only for critical situations.' 
+    }, { status: 400 });
+  }
 
   const result = await Order.deleteOne({ _id });
   if (result.deletedCount === 0) return Response.json({ error: 'Order not found' }, { status: 404 });

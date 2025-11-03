@@ -151,7 +151,6 @@ export async function POST(req) {
         phone: address?.phone || '',
         streetAddress: address?.streetAddress || '',
         city: address?.city || '',
-        postalCode: address?.postalCode || '',
         country: address?.country || 'PH',
         email: billingEmail,
         fulfillment: address?.fulfillment || undefined,
@@ -191,7 +190,7 @@ export async function POST(req) {
           line_items: lineItems,
           send_email_receipt: true,
           success_url: `${base}orders?intent=${intentId}&clear-cart=1`,
-          cancel_url: `${base}cart?canceled=1`,
+          cancel_url: `${base}cart?payment=failed&intent=${intentId}`,
           billing: {
             name: address?.name || 'Customer',
             email: billingEmail,
@@ -199,7 +198,6 @@ export async function POST(req) {
             address: {
               line1: address?.streetAddress || '',
               city: address?.city || '',
-              postal_code: address?.postalCode || '',
               country: 'PH',
             },
           },

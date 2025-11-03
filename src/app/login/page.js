@@ -25,6 +25,9 @@ function LoginForm() {
   const [loginInProgress, setLoginInProgress] = useState(false);
   const [error, setError] = useState('');
 
+  // 👇 NEW: show/hide password toggle
+  const [showPassword, setShowPassword] = useState(false);
+
   useEffect(() => {
     const err = searchParams.get('error');
     if (err) setError(getErrorMessage(err));
@@ -82,16 +85,28 @@ function LoginForm() {
               className={inputCls}
               aria-invalid={!!error}
             />
-            <input
-              type="password"
-              name="password"
-              placeholder="Password"
-              value={password}
-              disabled={loginInProgress}
-              onChange={(ev) => setPassword(ev.target.value)}
-              className={inputCls}
-              aria-invalid={!!error}
-            />
+
+            {/* Password with show/hide toggle */}
+            <div className="relative">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                name="password"
+                placeholder="Password"
+                value={password}
+                disabled={loginInProgress}
+                onChange={(ev) => setPassword(ev.target.value)}
+                className={inputCls + ' pr-12'} // extra padding for the button
+                aria-invalid={!!error}
+              />
+              <span
+                type="button"
+                onClick={() => setShowPassword((v) => !v)}
+                disabled={loginInProgress}
+                className="absolute cursor-pointer inset-y-0 right-4 flex items-center text-xs font-medium text-zinc-500 hover:text-zinc-700 disabled:opacity-60"
+              >
+                {showPassword ? 'Hide' : 'Show'}
+              </span>
+            </div>
 
             <button
               disabled={loginInProgress}
@@ -110,6 +125,12 @@ function LoginForm() {
               <Link className="ml-1 font-semibold text-[#7A4E2A] underline" href="/register">
                 Register here
               </Link>
+
+               <div className="text-right text-xs text-zinc-600">
+                <Link href="/forgot-password" className="text-[#7A4E2A] hover:underline">
+                  Forgot password?
+                </Link>
+              </div>
             </div>
           </form>
         </div>

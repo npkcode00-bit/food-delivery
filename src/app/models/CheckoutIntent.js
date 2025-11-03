@@ -7,7 +7,6 @@ const AddressSchema = new mongoose.Schema(
     phone: String,
     streetAddress: String,
     city: String,
-    postalCode: String,
     country: { type: String, default: 'PH' },
     email: String,
 

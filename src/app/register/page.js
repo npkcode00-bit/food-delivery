@@ -19,6 +19,9 @@ export default function RegisterPage() {
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // 👇 NEW: controls show/hide password
+  const [showPassword, setShowPassword] = useState(false);
+
   function update(key, value) {
     setForm((s) => ({ ...s, [key]: value }));
   }
@@ -141,15 +144,26 @@ export default function RegisterPage() {
                   required
                 />
 
-                <input
-                  className={inputCls}
-                  type="password"
-                  placeholder="Password (min 5 chars)"
-                  value={form.password}
-                  onChange={(e) => update('password', e.target.value)}
-                  required
-                  minLength={5}
-                />
+                {/* 👇 Password with show/hide toggle */}
+                <div className="relative">
+                  <input
+                    className={inputCls + ' pr-12'} // extra right padding for the button
+                    type={showPassword ? 'text' : 'password'}
+                    placeholder="Password (min 5 chars)"
+                    value={form.password}
+                    onChange={(e) => update('password', e.target.value)}
+                    required
+                    minLength={5}
+                  />
+                  <span
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    disabled={loading}
+                    className="absolute cursor-pointer inset-y-0 right-4 flex items-center text-xs font-medium text-zinc-500 hover:text-zinc-700 disabled:opacity-60"
+                  >
+                    {showPassword ? 'Hide' : 'Show'}
+                  </span>
+                </div>
 
                 <button
                   type="submit"

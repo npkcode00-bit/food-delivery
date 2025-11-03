@@ -26,7 +26,6 @@ export default function CartPage() {
     phone: '',
     streetAddress: '',
     city: '',
-    postalCode: '',
     country: 'Philippines',
     orderMethod: 'pickup', // 👈 canonical field
   });
@@ -116,7 +115,6 @@ export default function CartPage() {
     if (address.orderMethod === 'delivery') {
       if (!address.streetAddress?.trim()) return toast.error('Street address is required');
       if (!address.city?.trim()) return toast.error('City is required');
-      if (!address.postalCode?.trim()) return toast.error('Postal code is required');
       if (!address.country?.trim()) return toast.error('Country is required');
     }
 
