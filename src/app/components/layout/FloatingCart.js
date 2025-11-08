@@ -171,9 +171,9 @@ export default function FloatingCart() {
                   Continue
                 </button>
                 <button
-                style={{color:'white'}}
+                style={{color:'white',backgroundColor:'#AB886D'}}
                   type="button"
-                  className="w-1/2 rounded-full bg-gradient-to-r from-[#A5724A] to-[#7A4E2A] px-4 py-2 font-semibold text-white shadow-sm cursor-pointer"
+                  className="w-1/2 rounded-full px-4 py-2 font-semibold text-white shadow-sm cursor-pointer"
                   onClick={goCheckout}
                 >
                   Checkout

@@ -13,6 +13,27 @@ export default function MenuPage() {
   const [loading, setLoading] = useState(true);
   const [selectedCategoryId, setSelectedCategoryId] = useState(null);
 
+  const role = session?.user?.role;
+  const isAccounting =
+    session?.user?.accounting === true || role === 'accounting';
+
+  // 🚫 Block accounting users from this page
+  if (status === 'authenticated' && isAccounting) {
+    return (
+      <section className="max-w-3xl mx-auto mt-16 text-center">
+        <SectionHeaders
+          mainHeader="Menu not available"
+          subHeader="The customer menu is hidden for accounting users."
+        />
+        <p className="mt-4 text-sm text-zinc-600">
+          Please use the <span className="font-semibold">Accounting</span> or{' '}
+          <span className="font-semibold">Orders</span> sections to manage
+          reports and transactions.
+        </p>
+      </section>
+    );
+  }
+
   useEffect(() => {
     let alive = true;
 
@@ -22,7 +43,12 @@ export default function MenuPage() {
           fetch('/api/categories', { cache: 'no-store' }),
           fetch('/api/menu-items', { cache: 'no-store' }),
         ]);
-        const [cats, items] = await Promise.all([catsRes.json(), itemsRes.json()]);
+
+        const [cats, items] = await Promise.all([
+          catsRes.json(),
+          itemsRes.json(),
+        ]);
+
         if (!alive) return;
         const safeCats = Array.isArray(cats) ? cats : [];
         const safeItems = Array.isArray(items) ? items : [];
@@ -40,23 +66,29 @@ export default function MenuPage() {
       }
     })();
 
-    return () => { alive = false; };
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
     if (!categories.length) return;
-    if (!selectedCategoryId || !categories.some(c => c._id === selectedCategoryId)) {
+    if (
+      !selectedCategoryId ||
+      !categories.some((c) => c._id === selectedCategoryId)
+    ) {
       setSelectedCategoryId(categories[0]._id);
     }
   }, [categories, selectedCategoryId]);
 
   const currentCategory = useMemo(
-    () => categories.find(c => c._id === selectedCategoryId) || null,
+    () => categories.find((c) => c._id === selectedCategoryId) || null,
     [categories, selectedCategoryId]
   );
 
   const itemsForSelected = useMemo(
-    () => menuItems.filter(item => item.category === selectedCategoryId),
+    () => menuItems.filter((item) => item.category === selectedCategoryId),
     [menuItems, selectedCategoryId]
   );
 
@@ -80,7 +112,10 @@ export default function MenuPage() {
         <div className="px-6 py-10 md:px-12 md:py-14">
           <div className="mb-8 text-center">
             {status === 'authenticated' && (
-              <SectionHeaders subHeader="our menu" mainHeader="Browse by Category" />
+              <SectionHeaders
+                subHeader="our menu"
+                mainHeader="Browse by Category"
+              />
             )}
             {status === 'unauthenticated' && (
               <SectionHeaders
@@ -92,7 +127,9 @@ export default function MenuPage() {
 
           {/* Mobile: dropdown (brown focus/border) */}
           <div className="mb-6 md:hidden">
-            <label htmlFor="category" className="sr-only">Category</label>
+            <label htmlFor="category" className="sr-only">
+              Category
+            </label>
             <select
               id="category"
               className="w-full rounded-xl border border-[#B08B62]/60 bg-white/80 px-4 py-2 text-zinc-700 backdrop-blur-md focus:outline-none focus:ring-2 focus:ring-[#8B5E34]/60"
@@ -101,7 +138,9 @@ export default function MenuPage() {
               disabled={loading || categories.length === 0}
             >
               {categories.map((c) => (
-                <option key={c._id} value={c._id}>{c.name}</option>
+                <option key={c._id} value={c._id}>
+                  {c.name}
+                </option>
               ))}
             </select>
           </div>
@@ -120,10 +159,10 @@ export default function MenuPage() {
                       return (
                         <li key={c._id}>
                           <span
-                            role="button"                 // accessible: behaves like a button
-                            tabIndex={0}                  // focusable with keyboard
+                            role="button"
+                            tabIndex={0}
                             onClick={() => setSelectedCategoryId(c._id)}
-                            onKeyDown={(e) => {           // activate with Enter/Space
+                            onKeyDown={(e) => {
                               if (e.key === 'Enter' || e.key === ' ') {
                                 e.preventDefault();
                                 setSelectedCategoryId(c._id);
@@ -152,7 +191,9 @@ export default function MenuPage() {
             {/* Main content */}
             <main className="md:col-span-9">
               {loading && categories.length === 0 ? (
-                <div className="text-center text-gray-500">Loading menu…</div>
+                <div className="text-center text-gray-500">
+                  Loading menu…
+                </div>
               ) : (
                 <>
                   <div className="mb-4 text-center md:text-left">

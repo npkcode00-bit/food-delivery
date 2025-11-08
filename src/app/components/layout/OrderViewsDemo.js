@@ -19,15 +19,15 @@ const STATUS_META = {
   placed: { label: 'Placed' },
   in_kitchen: { label: 'In the kitchen' },
   cancelled: { label: 'Cancelled' },
-  
+
   // Delivery statuses
   on_the_way: { label: 'On the way' },
   delivered: { label: 'Delivered' },
-  
+
   // Pickup statuses
   ready_for_pickup: { label: 'Ready for pickup' },
   picked_up: { label: 'Picked up' },
-  
+
   // Dine-in statuses
   served: { label: 'Served' },
   completed: { label: 'Completed' },
@@ -40,9 +40,16 @@ const ORDER_METHOD_LABEL = {
 };
 
 const fmtTime = (iso) =>
-  new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(iso));
+  new Intl.DateTimeFormat(undefined, {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(new Date(iso));
 
-const currency = (n) => new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(n);
+const currency = (n) =>
+  new Intl.NumberFormat('en-PH', {
+    style: 'currency',
+    currency: 'PHP',
+  }).format(n);
 
 const getOrderMethodLabel = (m) => ORDER_METHOD_LABEL[m] || (m || '—');
 
@@ -80,17 +87,17 @@ async function archiveOrder(orderId) {
     const response = await fetch('/api/orders', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
+      body: JSON.stringify({
         _id: orderId,
-        archived: true
+        archived: true,
       }),
     });
-    
+
     if (!response.ok) {
       const data = await response.json();
       throw new Error(data.error || 'Failed to archive order');
     }
-    
+
     return { ok: true };
   } catch (error) {
     return { ok: false, error: error.message };
@@ -102,17 +109,17 @@ async function unarchiveOrder(orderId) {
     const response = await fetch('/api/orders', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ 
+      body: JSON.stringify({
         _id: orderId,
-        archived: false
+        archived: false,
       }),
     });
-    
+
     if (!response.ok) {
       const data = await response.json();
       throw new Error(data.error || 'Failed to unarchive order');
     }
-    
+
     return { ok: true };
   } catch (error) {
     return { ok: false, error: error.message };
@@ -204,7 +211,14 @@ function Modal({ open, onClose, title, children }) {
         zIndex: 50,
       }}
     >
-      <div style={{ background: '#fff', borderRadius: 16, width: 'min(640px, 92vw)', overflow: 'hidden' }}>
+      <div
+        style={{
+          background: '#fff',
+          borderRadius: 16,
+          width: 'min(640px, 92vw)',
+          overflow: 'hidden',
+        }}
+      >
         <div
           style={{
             padding: 16,
@@ -215,7 +229,16 @@ function Modal({ open, onClose, title, children }) {
           }}
         >
           <h3 style={{ margin: 0, fontSize: 18 }}>{title}</h3>
-          <button onClick={onClose} style={{ background: 'transparent', border: 0, fontSize: 20, cursor: 'pointer', maxWidth: '30px' }}>
+          <button
+            onClick={onClose}
+            style={{
+              background: 'transparent',
+              border: 0,
+              fontSize: 20,
+              cursor: 'pointer',
+              maxWidth: '30px',
+            }}
+          >
             ×
           </button>
         </div>
@@ -228,28 +251,37 @@ function Modal({ open, onClose, title, children }) {
 /* -------------------- Feature bits -------------------- */
 function StatusChip({ status, archived }) {
   if (archived) return <Chip tone="archived">Archived</Chip>;
-  
+
   const tone =
-    status === 'in_kitchen' ? 'warn' :
-    ['on_the_way', 'ready_for_pickup', 'served'].includes(status) ? 'info' :
-    ['delivered', 'picked_up', 'completed'].includes(status) ? 'ok' :
-    status === 'cancelled' ? 'danger' : 'default';
+    status === 'in_kitchen'
+      ? 'warn'
+      : ['on_the_way', 'ready_for_pickup', 'served'].includes(status)
+      ? 'info'
+      : ['delivered', 'picked_up', 'completed'].includes(status)
+      ? 'ok'
+      : status === 'cancelled'
+      ? 'danger'
+      : 'default';
   return <Chip tone={tone}>{STATUS_META[status]?.label || status}</Chip>;
 }
 
 function OrderMethodChip({ method }) {
   const label = getOrderMethodLabel(method);
   const tone =
-    method === 'pickup'   ? 'info' :
-    method === 'dine_in'  ? 'ok' :
-    method === 'delivery' ? 'warn' : 'default';
+    method === 'pickup'
+      ? 'info'
+      : method === 'dine_in'
+      ? 'ok'
+      : method === 'delivery'
+      ? 'warn'
+      : 'default';
   return <Chip tone={tone}>{label}</Chip>;
 }
 
 function StatusStepper({ status, orderMethod }) {
   const flow = getStatusFlow(orderMethod);
   const active = Math.max(flow.indexOf(status), 0);
-  
+
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
       {flow.map((s, i) => (
@@ -284,7 +316,11 @@ function StatusStepper({ status, orderMethod }) {
 function makeLineKey(item, index) {
   const id = String(item._id || 'noid');
   const size = String(item.size?._id || 'nosize');
-  const extras = (item.extras || []).map(e => String(e._id || e.name)).sort().join('|') || 'noextras';
+  const extras =
+    (item.extras || [])
+      .map((e) => String(e._id || e.name))
+      .sort()
+      .join('|') || 'noextras';
   return `${id}:${size}:${extras}:${index}`;
 }
 
@@ -296,7 +332,9 @@ function OrderDetails({ order }) {
         let itemPrice = item.basePrice || 0;
         if (item.size?.price) itemPrice += item.size.price;
         if (item.extras && Array.isArray(item.extras)) {
-          item.extras.forEach(extra => { itemPrice += extra.price || 0; });
+          item.extras.forEach((extra) => {
+            itemPrice += extra.price || 0;
+          });
         }
         return sum + itemPrice;
       }, 0);
@@ -319,11 +357,14 @@ function OrderDetails({ order }) {
         let itemPrice = item.basePrice || 0;
         if (item.size?.price) itemPrice += item.size.price;
         if (item.extras && Array.isArray(item.extras)) {
-          item.extras.forEach(extra => { itemPrice += extra.price || 0; });
+          item.extras.forEach((extra) => {
+            itemPrice += extra.price || 0;
+          });
         }
         let itemName = item.name || 'Unknown Item';
         if (item.size?.name) itemName += ` (${item.size.name})`;
-        if (item.extras?.length) itemName += ` + ${item.extras.map(e => e.name).join(', ')}`;
+        if (item.extras?.length)
+          itemName += ` + ${item.extras.map((e) => e.name).join(', ')}`;
 
         const lineId = makeLineKey(item, index);
         return { id: lineId, name: itemName, qty: 1, price: itemPrice };
@@ -341,18 +382,22 @@ function OrderDetails({ order }) {
     <div style={{ display: 'grid', gap: 12 }}>
       {/* Show archived banner if order is archived */}
       {order.archived && (
-        <div style={{ 
-          padding: 12, 
-          background: '#f3f4f6', 
-          borderRadius: 12, 
-          border: '1px solid #d1d5db',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8
-        }}>
+        <div
+          style={{
+            padding: 12,
+            background: '#f3f4f6',
+            borderRadius: 12,
+            border: '1px solid #d1d5db',
+            display: 'flex',
+            alignItems: 'center',
+            gap: 8,
+          }}
+        >
           <span style={{ fontSize: 20 }}>🗄️</span>
           <div>
-            <div style={{ fontWeight: 600, color: '#374151' }}>This order is archived</div>
+            <div style={{ fontWeight: 600, color: '#374151' }}>
+              This order is archived
+            </div>
             <div style={{ fontSize: 12, color: '#6b7280' }}>
               Archived on {new Date(order.archivedAt).toLocaleString('en-PH')}
               {order.archivedBy && ` by ${order.archivedBy}`}
@@ -361,20 +406,35 @@ function OrderDetails({ order }) {
         </div>
       )}
 
-      <div style={{ 
-        padding: 12, 
-        background: '#f8fafc', 
-        borderRadius: 12, 
-        border: '1px solid #e5e7eb',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'space-between'
-      }}>
+      <div
+        style={{
+          padding: 12,
+          background: '#f8fafc',
+          borderRadius: 12,
+          border: '1px solid #e5e7eb',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}
+      >
         <div>
-          <div style={{ fontSize: 12, color: '#64748b', marginBottom: 4 }}>Order Method</div>
+          <div style={{ fontSize: 12, color: '#64748b', marginBottom: 4 }}>
+            Order Method
+          </div>
           <div style={{ fontWeight: 700, fontSize: 16 }}>
             {getOrderMethodLabel(displayOrderMethod)}
-            {!order.orderMethod && <span style={{ fontSize: 11, color: '#94a3b8', fontWeight: 400 }}> (not recorded)</span>}
+            {!order.orderMethod && (
+              <span
+                style={{
+                  fontSize: 11,
+                  color: '#94a3b8',
+                  fontWeight: 400,
+                }}
+              >
+                {' '}
+                (not recorded)
+              </span>
+            )}
           </div>
         </div>
         <OrderMethodChip method={displayOrderMethod} />
@@ -404,7 +464,7 @@ function OrderDetails({ order }) {
             <div>{order.phone}</div>
           </div>
         )}
-        
+
         {deliveryAddress && (
           <div style={{ gridColumn: '1 / -1' }}>
             <div style={{ fontSize: 12, color: '#64748b' }}>
@@ -413,7 +473,7 @@ function OrderDetails({ order }) {
             <div>{deliveryAddress}</div>
           </div>
         )}
-        
+
         <div style={{ gridColumn: '1 / -1' }}>
           <div style={{ fontSize: 12, color: '#64748b' }}>Payment Status</div>
           <div>{order.paid ? '✅ Paid' : '⏳ Pending'}</div>
@@ -424,11 +484,22 @@ function OrderDetails({ order }) {
 
       <div>
         <div style={{ fontSize: 12, color: '#64748b', marginBottom: 6 }}>Items</div>
-        <div style={{ border: '1px solid #e5e7eb', borderRadius: 12, overflow: 'hidden' }}>
+        <div
+          style={{
+            border: '1px solid #e5e7eb',
+            borderRadius: 12,
+            overflow: 'hidden',
+          }}
+        >
           {orderItems.map((it, idx) => (
             <div
               key={`${it.id}-${idx}`}
-              style={{ display: 'flex', justifyContent: 'space-between', padding: 12, borderBottom: '1px solid #e5e7eb' }}
+              style={{
+                display: 'flex',
+                justifyContent: 'space-between',
+                padding: 12,
+                borderBottom: '1px solid #e5e7eb',
+              }}
             >
               <div>
                 <div style={{ fontWeight: 600 }}>{it.name}</div>
@@ -436,10 +507,18 @@ function OrderDetails({ order }) {
                   Qty: {it.qty} × {currency(it.price)}
                 </div>
               </div>
-              <div style={{ fontWeight: 700 }}>{currency(it.qty * it.price)}</div>
+              <div style={{ fontWeight: 700 }}>
+                {currency(it.qty * it.price)}
+              </div>
             </div>
           ))}
-          <div style={{ display: 'flex', justifyContent: 'space-between', padding: 12 }}>
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              padding: 12,
+            }}
+          >
             <div style={{ fontWeight: 600 }}>Total</div>
             <div style={{ fontWeight: 700 }}>{currency(total)}</div>
           </div>
@@ -448,8 +527,17 @@ function OrderDetails({ order }) {
 
       {order.notes && (
         <div>
-          <div style={{ fontSize: 12, color: '#64748b', marginBottom: 6 }}>Notes</div>
-          <div style={{ padding: 12, border: '1px solid #e5e7eb', borderRadius: 12, background: '#f8fafc' }}>
+          <div style={{ fontSize: 12, color: '#64748b', marginBottom: 6 }}>
+            Notes
+          </div>
+          <div
+            style={{
+              padding: 12,
+              border: '1px solid #e5e7eb',
+              borderRadius: 12,
+              background: '#f8fafc',
+            }}
+          >
             {order.notes}
           </div>
         </div>
@@ -463,22 +551,27 @@ function AdminActions({ order, onChange, onRefresh, onArchive, canArchive }) {
   const orderMethod = order.orderMethod || 'pickup';
   const flow = getStatusFlow(orderMethod);
   const isArchived = order.archived === true;
-  
+
   // Get button labels based on order method
   const getButtonConfig = () => {
     const currentIndex = flow.indexOf(order.status);
     const buttons = [];
-    
+
     for (let i = currentIndex + 1; i < flow.length; i++) {
       const nextStatus = flow[i];
       const meta = STATUS_META[nextStatus];
       buttons.push({
         status: nextStatus,
         label: meta?.label || nextStatus,
-        variant: i === currentIndex + 1 ? 'solid' : i === currentIndex + 2 ? 'outline' : 'ghost'
+        variant:
+          i === currentIndex + 1
+            ? 'solid'
+            : i === currentIndex + 2
+            ? 'outline'
+            : 'ghost',
       });
     }
-    
+
     return buttons;
   };
 
@@ -502,21 +595,30 @@ function AdminActions({ order, onChange, onRefresh, onArchive, canArchive }) {
       (t) => (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div>
-            <div style={{ fontWeight: 600, marginBottom: 4 }}>Archive order #{displayId}?</div>
+            <div style={{ fontWeight: 600, marginBottom: 4 }}>
+              Archive order #{displayId}?
+            </div>
             <div style={{ fontSize: 13, color: '#64748b' }}>
-              This order will be hidden from the main view but can be restored later.
+              This order will be hidden from the main view but can be restored
+              later.
             </div>
           </div>
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          <div
+            style={{
+              display: 'flex',
+              gap: 8,
+              justifyContent: 'flex-end',
+            }}
+          >
             <button
               onClick={() => toast.dismiss(t.id)}
-              style={{ 
-                padding: '6px 12px', 
-                borderRadius: 8, 
-                border: '1px solid #e5e7eb', 
-                background: '#fff', 
-                cursor: 'pointer', 
-                fontWeight: 600 
+              style={{
+                padding: '6px 12px',
+                borderRadius: 8,
+                border: '1px solid #e5e7eb',
+                background: '#fff',
+                cursor: 'pointer',
+                fontWeight: 600,
               }}
             >
               Cancel
@@ -535,14 +637,14 @@ function AdminActions({ order, onChange, onRefresh, onArchive, canArchive }) {
                   toast.error(res.error || 'Failed to archive order');
                 }
               }}
-              style={{ 
-                padding: '6px 12px', 
-                borderRadius: 8, 
-                border: '1px solid #f59e0b', 
-                background: '#f59e0b', 
-                color: '#fff', 
-                cursor: 'pointer', 
-                fontWeight: 600 
+              style={{
+                padding: '6px 12px',
+                borderRadius: 8,
+                border: '1px solid #f59e0b',
+                background: '#f59e0b',
+                color: '#fff',
+                cursor: 'pointer',
+                fontWeight: 600,
               }}
             >
               Archive
@@ -560,21 +662,29 @@ function AdminActions({ order, onChange, onRefresh, onArchive, canArchive }) {
       (t) => (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <div>
-            <div style={{ fontWeight: 600, marginBottom: 4 }}>Unarchive order #{displayId}?</div>
+            <div style={{ fontWeight: 600, marginBottom: 4 }}>
+              Unarchive order #{displayId}?
+            </div>
             <div style={{ fontSize: 13, color: '#64748b' }}>
               This order will be restored to the main orders view.
             </div>
           </div>
-          <div style={{ display: 'flex', gap: 8, justifyContent: 'flex-end' }}>
+          <div
+            style={{
+              display: 'flex',
+              gap: 8,
+              justifyContent: 'flex-end',
+            }}
+          >
             <button
               onClick={() => toast.dismiss(t.id)}
-              style={{ 
-                padding: '6px 12px', 
-                borderRadius: 8, 
-                border: '1px solid #e5e7eb', 
-                background: '#fff', 
-                cursor: 'pointer', 
-                fontWeight: 600 
+              style={{
+                padding: '6px 12px',
+                borderRadius: 8,
+                border: '1px solid #e5e7eb',
+                background: '#fff',
+                cursor: 'pointer',
+                fontWeight: 600,
               }}
             >
               Cancel
@@ -593,14 +703,14 @@ function AdminActions({ order, onChange, onRefresh, onArchive, canArchive }) {
                   toast.error(res.error || 'Failed to restore order');
                 }
               }}
-              style={{ 
-                padding: '6px 12px', 
-                borderRadius: 8, 
-                border: '1px solid #10b981', 
-                background: '#10b981', 
-                color: '#fff', 
-                cursor: 'pointer', 
-                fontWeight: 600 
+              style={{
+                padding: '6px 12px',
+                borderRadius: 8,
+                border: '1px solid #10b981',
+                background: '#10b981',
+                color: '#fff',
+                cursor: 'pointer',
+                fontWeight: 600,
               }}
             >
               Unarchive
@@ -613,17 +723,18 @@ function AdminActions({ order, onChange, onRefresh, onArchive, canArchive }) {
   };
 
   return (
-    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-      {!isArchived && buttons.map((btn) => (
-        <Button
-          key={btn.status}
-          variant={btn.variant}
-          disabled={!!loading}
-          onClick={() => go(btn.status)}
-        >
-          {loading === btn.status ? 'Updating…' : btn.label}
-        </Button>
-      ))}
+    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap',width:'100%',  }}>
+      {!isArchived &&
+        buttons.map((btn) => (
+          <Button
+            key={btn.status}
+            variant={btn.variant}
+            disabled={!!loading}
+            onClick={() => go(btn.status)}
+          >
+            {loading === btn.status ? 'Updating…' : btn.label}
+          </Button>
+        ))}
 
       {canArchive && (
         <>
@@ -632,11 +743,11 @@ function AdminActions({ order, onChange, onRefresh, onArchive, canArchive }) {
               variant="outline"
               disabled={!!loading}
               onClick={handleUnarchive}
-              style={{ 
-                marginLeft: !isArchived ? 'auto' : undefined, 
-                background: '#d1fae5', 
-                color: '#065f46', 
-                borderColor: '#6ee7b7' 
+              style={{
+                marginLeft: !isArchived ? 'auto' : undefined,
+                background: '#d1fae5',
+                color: '#065f46',
+                borderColor: '#6ee7b7',
               }}
             >
               {loading === 'unarchive' ? 'Restoring…' : ' Unarchive'}
@@ -646,11 +757,11 @@ function AdminActions({ order, onChange, onRefresh, onArchive, canArchive }) {
               variant="outline"
               disabled={!!loading}
               onClick={handleArchive}
-              style={{ 
-                marginLeft: 'auto', 
-                background: '#fef3c7', 
-                color: '#92400e', 
-                borderColor: '#fcd34d' 
+              style={{
+                marginLeft: 'auto',
+                background: '#fef3c7',
+                color: '#92400e',
+                borderColor: '#fcd34d',
               }}
             >
               {loading === 'archive' ? 'Archiving…' : 'Archive'}
@@ -665,16 +776,27 @@ function AdminActions({ order, onChange, onRefresh, onArchive, canArchive }) {
 /* -------------------- Main Card -------------------- */
 function OrderCard({ initialOrder, role, canArchive, onRefresh, onArchive }) {
   const [order, setOrder] = useState(initialOrder);
-  useEffect(() => { setOrder(initialOrder); }, [initialOrder]);
+  useEffect(() => {
+    setOrder(initialOrder);
+  }, [initialOrder]);
   const displayOrderId = order._id?.slice(-6).toUpperCase() || order.id || 'N/A';
   const displayOrderMethod = order.orderMethod || 'pickup';
 
   return (
     <Card>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+      <div
+        style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 12,
+        }}
+      >
         <div>
           <div style={{ fontSize: 18, fontWeight: 700 }}>Order #{displayOrderId}</div>
-          <div style={{ fontSize: 13, color: '#64748b' }}>Placed {fmtTime(order.createdAt)}</div>
+          <div style={{ fontSize: 13, color: '#64748b' }}>
+            Placed {fmtTime(order.createdAt)}
+          </div>
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           <OrderMethodChip method={displayOrderMethod} />
@@ -684,12 +806,30 @@ function OrderCard({ initialOrder, role, canArchive, onRefresh, onArchive }) {
 
       {!order.archived && (
         <div style={{ marginTop: 12 }}>
-          <StatusStepper status={order.status || 'placed'} orderMethod={displayOrderMethod} />
+          <StatusStepper
+            status={order.status || 'placed'}
+            orderMethod={displayOrderMethod}
+          />
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: 10, marginTop: 12, flexWrap: 'wrap' }}>
-        <Button small variant="outline" onClick={() => window.dispatchEvent(new CustomEvent('open-order-modal-' + order._id))}>
+      <div
+        style={{
+          display: 'flex',
+          gap: 10,
+          marginTop: 12,
+          flexWrap: 'wrap',
+        }}
+      >
+        <Button
+          small
+          variant="outline"
+          onClick={() =>
+            window.dispatchEvent(
+              new CustomEvent('open-order-modal-' + order._id)
+            )
+          }
+        >
           View details
         </Button>
         {role === 'admin' && (
@@ -715,11 +855,16 @@ function ModalWrapper({ order }) {
       if (e.type === 'open-order-modal-' + order._id) setOpen(true);
     };
     window.addEventListener('open-order-modal-' + order._id, handler);
-    return () => window.removeEventListener('open-order-modal-' + order._id, handler);
+    return () =>
+      window.removeEventListener('open-order-modal-' + order._id, handler);
   }, [order._id]);
   const displayOrderId = order._id?.slice(-6).toUpperCase() || order.id || 'N/A';
   return (
-    <Modal open={open} onClose={() => setOpen(false)} title={`Order #${displayOrderId}`}>
+    <Modal
+      open={open}
+      onClose={() => setOpen(false)}
+      title={`Order #${displayOrderId}`}
+    >
       <OrderDetails order={order} />
     </Modal>
   );
@@ -729,13 +874,18 @@ function ModalWrapper({ order }) {
 export default function OrderViewsDemo({ orders = [], onOrderUpdate }) {
   const { data: session } = useSession();
 
-  const userIsAdmin   = session?.user?.role === 'admin'   || session?.user?.admin === true;
-  const userIsCashier = session?.user?.role === 'cashier' || session?.user?.cashier === true;
-  const userIsStaff   = userIsAdmin || userIsCashier;
+  const userIsAdmin =
+    session?.user?.role === 'admin' || session?.user?.admin === true;
+  const userIsCashier =
+    session?.user?.role === 'cashier' || session?.user?.cashier === true;
+  const userIsStaff = userIsAdmin || userIsCashier;
 
   const [role, setRole] = useState('customer');
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('placed');
+
+  // 👉 dynamic label for staff view button
+  const staffViewLabel = userIsAdmin ? 'Admin view' : 'Cashier view';
 
   // Group statuses by stage for filtering
   const STATUS_GROUPS = {
@@ -748,15 +898,15 @@ export default function OrderViewsDemo({ orders = [], onOrderUpdate }) {
 
   // Counts per group
   const counts = useMemo(() => {
-    const map = { 
-      placed: 0, 
-      in_progress: 0, 
-      ready_out: 0, 
+    const map = {
+      placed: 0,
+      in_progress: 0,
+      ready_out: 0,
       completed: 0,
       cancelled: 0,
-      archived: 0 
+      archived: 0,
     };
-    
+
     for (const o of orders) {
       // Handle archived separately
       if (o.archived) {
@@ -776,13 +926,13 @@ export default function OrderViewsDemo({ orders = [], onOrderUpdate }) {
         map.cancelled += 1;
       }
     }
-    
+
     return map;
   }, [orders]);
 
   // Text search + status filter + SORT BY OLDEST FIRST
   const filteredOrders = orders
-    .filter(order => {
+    .filter((order) => {
       // Handle archived filter
       if (statusFilter === 'archived') {
         return order.archived === true;
@@ -807,7 +957,13 @@ export default function OrderViewsDemo({ orders = [], onOrderUpdate }) {
       if (order.userEmail?.toLowerCase().includes(s)) return true;
 
       const dt = new Date(order.createdAt);
-      const long = dt.toLocaleDateString('en-US', { year:'numeric', month:'long', day:'numeric' }).toLowerCase();
+      const long = dt
+        .toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+        })
+        .toLowerCase();
       const short = dt.toLocaleDateString('en-US').toLowerCase();
       if (long.includes(s) || short.includes(s)) return true;
 
@@ -815,25 +971,44 @@ export default function OrderViewsDemo({ orders = [], onOrderUpdate }) {
       const allStatusKeywords = {
         placed: ['placed', 'new', 'pending'],
         in_progress: ['kitchen', 'cooking', 'preparing', 'progress'],
-        ready_out: ['ready', 'way', 'delivery', 'delivering', 'transit', 'pickup', 'served', 'out'],
-        completed: ['delivered', 'picked', 'complete', 'completed', 'done', 'finished'],
+        ready_out: [
+          'ready',
+          'way',
+          'delivery',
+          'delivering',
+          'transit',
+          'pickup',
+          'served',
+          'out',
+        ],
+        completed: [
+          'delivered',
+          'picked',
+          'complete',
+          'completed',
+          'done',
+          'finished',
+        ],
         cancelled: ['cancelled', 'canceled', 'cancel'],
         archived: ['archived', 'archive'],
       };
-      
+
       for (const [group, kws] of Object.entries(allStatusKeywords)) {
         const groupStatuses = STATUS_GROUPS[group] || [group];
-        if (groupStatuses.includes(order.status) && kws.some(k => k.includes(s))) {
+        if (
+          groupStatuses.includes(order.status) &&
+          kws.some((k) => k.includes(s))
+        ) {
           return true;
         }
       }
 
       if (order.cartProducts && Array.isArray(order.cartProducts)) {
-        const match = order.cartProducts.some(item => {
+        const match = order.cartProducts.some((item) => {
           if (item.name?.toLowerCase().includes(s)) return true;
           if (item.size?.name?.toLowerCase().includes(s)) return true;
           if (Array.isArray(item.extras)) {
-            return item.extras.some(e => e.name?.toLowerCase().includes(s));
+            return item.extras.some((e) => e.name?.toLowerCase().includes(s));
           }
           return false;
         });
@@ -842,7 +1017,7 @@ export default function OrderViewsDemo({ orders = [], onOrderUpdate }) {
 
       return false;
     })
-    // ⭐ Sort by createdAt ASCENDING (oldest first) - FIRST ORDERS HAVE PRIORITY
+    // ⭐ Sort by createdAt ASCENDING (oldest first)
     .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
 
   if (orders.length === 0) {
@@ -851,7 +1026,9 @@ export default function OrderViewsDemo({ orders = [], onOrderUpdate }) {
         <Card>
           <div style={{ padding: 24 }}>
             <h2 style={{ marginTop: 0 }}>No orders yet</h2>
-            <p style={{ color: '#64748b' }}>Your orders will appear here once you place them.</p>
+            <p style={{ color: '#64748b' }}>
+              Your orders will appear here once you place them.
+            </p>
           </div>
         </Card>
       </div>
@@ -859,15 +1036,18 @@ export default function OrderViewsDemo({ orders = [], onOrderUpdate }) {
   }
 
   const FILTERS = [
-    { key: 'placed',      label: 'Placed' },
+    { key: 'placed', label: 'Placed' },
     { key: 'in_progress', label: 'In Kitchen' },
-    { key: 'ready_out',   label: 'Ready/Out for Delivery' },
-    { key: 'completed',   label: 'Completed' },
-    { key: 'archived',    label: 'Archived' },
+    { key: 'ready_out', label: 'Ready/Out for Delivery' },
+    { key: 'completed', label: 'Completed' },
+    { key: 'archived', label: 'Archived' },
   ];
 
   return (
-    <div className="max-w-7xl mx-auto px-2 md:px-0" style={{ paddingTop: 16, paddingBottom: 16 }}>
+    <div
+      className="max-w-7xl mx-auto px-2 md:px-0"
+      style={{ paddingTop: 16, paddingBottom: 16 }}
+    >
       <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
         {/* Sidebar */}
         <aside className="md:col-span-3">
@@ -877,7 +1057,7 @@ export default function OrderViewsDemo({ orders = [], onOrderUpdate }) {
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
             >
-              {FILTERS.map(f => (
+              {FILTERS.map((f) => (
                 <option key={f.key} value={f.key}>
                   {f.label} ({counts[f.key] || 0})
                 </option>
@@ -891,7 +1071,7 @@ export default function OrderViewsDemo({ orders = [], onOrderUpdate }) {
                 Status
               </h3>
               <ul className="space-y-1">
-                {FILTERS.map(f => {
+                {FILTERS.map((f) => {
                   const active = statusFilter === f.key;
                   const count = counts[f.key] || 0;
 
@@ -918,7 +1098,11 @@ export default function OrderViewsDemo({ orders = [], onOrderUpdate }) {
                       >
                         <div className="flex items-center justify-between">
                           <span>{f.label}</span>
-                          <span className={active ? 'opacity-90' : 'text-zinc-500'}>
+                          <span
+                            className={
+                              active ? 'opacity-90' : 'text-zinc-500'
+                            }
+                          >
                             {count}
                           </span>
                         </div>
@@ -963,11 +1147,17 @@ export default function OrderViewsDemo({ orders = [], onOrderUpdate }) {
 
             {userIsStaff && (
               <div style={{ display: 'flex', gap: 8 }}>
-                <Button variant={role === 'customer' ? 'solid' : 'outline'} onClick={() => setRole('customer')}>
+                <Button
+                  variant={role === 'customer' ? 'solid' : 'outline'}
+                  onClick={() => setRole('customer')}
+                >
                   Customer view
                 </Button>
-                <Button variant={role === 'admin' ? 'solid' : 'outline'} onClick={() => setRole('admin')}>
-                  Cashier view
+                <Button
+                  variant={role === 'admin' ? 'solid' : 'outline'}
+                  onClick={() => setRole('admin')}
+                >
+                  {staffViewLabel}
                 </Button>
               </div>
             )}
@@ -987,8 +1177,16 @@ export default function OrderViewsDemo({ orders = [], onOrderUpdate }) {
               ))
             ) : (
               <Card>
-                <div style={{ padding: 24, textAlign: 'center', color: '#64748b' }}>
-                  {statusFilter === 'archived' ? 'No archived orders.' : 'No orders in this status.'}
+                <div
+                  style={{
+                    padding: 24,
+                    textAlign: 'center',
+                    color: '#64748b',
+                  }}
+                >
+                  {statusFilter === 'archived'
+                    ? 'No archived orders.'
+                    : 'No orders in this status.'}
                 </div>
               </Card>
             )}

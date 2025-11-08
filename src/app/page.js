@@ -6,6 +6,7 @@ import { authOptions } from './api/auth/[...nextauth]/auth';
 import Hero from './components/layout/Hero';
 import HomeMenu from './components/layout/HomeMenu';
 import SectionHeaders from './components/layout/SectionHeaders';
+import AboutSection from './components/layout/AboutSection';
 
 export default async function Home() {
   const session = await getServerSession(authOptions);
@@ -41,14 +42,8 @@ export default async function Home() {
             <HomeMenu insideBox />
           </div>
 
-          {/* About */}
-          <section className="mx-auto my-16 max-w-3xl text-center" id="about">
-            <SectionHeaders subHeader="Our story" mainHeader="About us" />
-            <p className="mt-4 text-zinc-600">
-              Pngpl Cafe ☕ – A small business coffee shop serving blessed cups with love and
-              community. Join us for great coffee, warm fellowship, and a peaceful atmosphere.
-            </p>
-          </section>
+          {/* About - Now with modal */}
+          <AboutSection />
 
           {/* Contact */}
           <section className="mx-auto my-10 max-w-3xl text-center" id="contact">

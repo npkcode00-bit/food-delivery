@@ -3,6 +3,7 @@
 
 import { useContext, useState } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { signOut, useSession } from 'next-auth/react';
 
 import { CartContext } from '../AppContext';
@@ -17,7 +18,10 @@ function AuthLinks({ status, userFirstName, userName }) {
     return (
       <div className="flex items-center gap-3">
         {greeting && (
-          <Link href="/profile" className="whitespace-nowrap underline hover:no-underline cursor-pointer">
+          <Link
+            href="/profile"
+            className="whitespace-nowrap underline hover:no-underline cursor-pointer"
+          >
             Hello, {greeting}
           </Link>
         )}
@@ -36,7 +40,11 @@ function AuthLinks({ status, userFirstName, userName }) {
     <>
       <Link
         className="rounded-full px-6 py-2 border-2 cursor-pointer"
-        style={{ color: '#AB886D', backgroundColor: 'transparent', borderColor: '#AB886D' }}
+        style={{
+          color: '#AB886D',
+          backgroundColor: 'transparent',
+          borderColor: '#AB886D',
+        }}
         href="/login"
       >
         Login
@@ -70,6 +78,7 @@ function CartLink({ count }) {
 }
 
 export default function Header() {
+  const pathname = usePathname();
   const { data: session, status } = useSession();
   const user = session?.user || {};
   const isAuthed = status === 'authenticated';
@@ -77,6 +86,7 @@ export default function Header() {
   const role = user?.role; // 'customer' | 'admin' | 'accounting' | 'cashier' | undefined
   const isAdmin = user?.admin === true || role === 'admin';
   const isAccounting = user?.accounting === true || role === 'accounting';
+  const isCashier = user?.cashier === true || role === 'cashier';
   const isCustomer = role === 'customer';
 
   // HOME visibility: show if NOT authenticated OR is customer
@@ -91,25 +101,41 @@ export default function Header() {
 
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
-  const canSeeInventory = isAdmin || role === 'cashier';
+  const canSeeInventory = isAdmin || isCashier;
   const canSeeAccounting = isAdmin || isAccounting;
 
-  // Build nav items with the original conditions, then sort alphabetically by label.
+  // Build nav items, then sort alphabetically by label.
   const navItems = [
     { label: 'Accounting', href: '/accounting', show: canSeeAccounting },
     { label: 'Home', href: '/', show: showHome },
     { label: 'Inventory', href: '/inventory', show: canSeeInventory },
     { label: 'Items', href: '/admin', show: isAdmin },
-    { label: 'Menu', href: '/menu', show: user?.role !== 'cashier' },
+    // 👇 Hide Menu for accounting (and still hide for cashier)
+    {
+      label: 'Menu',
+      href: '/menu',
+      show: !isAccounting && !isCashier,
+    },
     { label: 'Orders', href: '/orders', show: isAuthed },
     { label: 'Users', href: '/users', show: isAdmin },
   ]
-    .filter(i => i.show)
+    .filter((i) => i.show)
     .sort((a, b) => a.label.localeCompare(b.label));
 
+  // Helper to check if link is active
+  const isActive = (href) => {
+    if (href === '/') {
+      return pathname === '/';
+    }
+    return pathname.startsWith(href);
+  };
+
   return (
-    <header className="border-b bg-transparent">
-      <div className=" mx-auto px-4 sm:px-6 lg:px-8 py-3 md:py-4">
+    <header 
+      className="border-b shadow-sm"
+
+    >
+      <div className="mx-auto px-4 sm:px-6 lg:px-8 py-3 md:py-4">
         {/* Top bar (logo + toggles) - mobile */}
         <div className="flex items-center md:hidden justify-between gap-3">
           <img src="/logo.png" alt="Logo" className="w-40 max-w-full h-auto" />
@@ -117,7 +143,7 @@ export default function Header() {
             {/* Cart only for authenticated customers */}
             {isAuthed && isCustomer && <CartLink count={cartCount} />}
             <button
-              className="p-2 rounded-md border hover:bg-gray-50 cursor-pointer"
+              className="p-2 rounded-md border hover:bg-white/80 cursor-pointer transition"
               onClick={() => setMobileNavOpen((prev) => !prev)}
               aria-label="Toggle navigation"
             >
@@ -129,16 +155,23 @@ export default function Header() {
         {/* Mobile nav drawer */}
         {mobileNavOpen && (
           <div className="md:hidden mt-2 rounded-xl border bg-white shadow-lg p-4 flex flex-col gap-2 text-center">
-            {navItems.map(item => (
-              <Link
-                key={item.href}
-                href={item.href}
-                className="py-2 rounded-lg hover:bg-gray-50 cursor-pointer"
-                onClick={() => setMobileNavOpen(false)}
-              >
-                {item.label}
-              </Link>
-            ))}
+            {navItems.map((item) => {
+              const active = isActive(item.href);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`py-2 px-4 rounded-lg cursor-pointer transition ${
+                    active
+                      ? 'bg-gradient-to-r from-[#A5724A] to-[#7A4E2A] text-white font-semibold shadow-md'
+                      : 'hover:bg-[#F3EDE2] text-gray-700'
+                  }`}
+                  onClick={() => setMobileNavOpen(false)}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
 
             {/* Auth */}
             <div className="pt-2 border-t mt-2">
@@ -154,13 +187,28 @@ export default function Header() {
         {/* Desktop header */}
         <div className="hidden md:flex items-center justify-between">
           <nav className="flex items-center gap-6 text-gray-600 font-semibold">
-            <img src="/logo.png" alt="Logo" className="w-56 lg:w-72 max-w-full h-auto" />
+            <img
+              src="/logo.png"
+              alt="Logo"
+              className="w-56 lg:w-72 max-w-full h-auto"
+            />
 
-            {navItems.map(item => (
-              <Link key={item.href} href={item.href} className="hover:text-black cursor-pointer">
-                {item.label}
-              </Link>
-            ))}
+            {navItems.map((item) => {
+              const active = isActive(item.href);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`px-4 py-2 rounded-lg cursor-pointer transition ${
+                    active
+                      ? 'bg-gradient-to-r from-[#A5724A] to-[#7A4E2A] text-white font-bold shadow-md'
+                      : 'hover:bg-white/60 hover:text-[#7A4E2A]'
+                  }`}
+                >
+                  {item.label}
+                </Link>
+              );
+            })}
           </nav>
 
           <nav className="flex items-center gap-4 text-gray-600 font-semibold">

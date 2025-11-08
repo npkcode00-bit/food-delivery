@@ -15,6 +15,8 @@ import * as XLSX from 'xlsx';
 // Register Chart.js components
 ChartJS.register(ArcElement, Tooltip, Legend);
 
+const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
+
 /** format a Date to YYYY-MM-DD in LOCAL time (for <input type="date">) */
 function formatDateInput(d) {
   const pad = (n) => String(n).padStart(2, '0');
@@ -68,6 +70,10 @@ export default function AccountingDashboardPage() {
   const [from, setFrom] = useState(formatDateInput(monthStart));
   const [to, setTo] = useState(formatDateInput(monthEnd));
 
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+
   // Dropdown/accordion state for the table
   const [showTable, setShowTable] = useState(false);
   
@@ -98,6 +104,7 @@ export default function AccountingDashboardPage() {
   // Handle filter type changes
   const handleFilterChange = (type) => {
     setFilterType(type);
+    setCurrentPage(1); // Reset to page 1
     const now = new Date();
     
     switch (type) {
@@ -131,15 +138,14 @@ export default function AccountingDashboardPage() {
   // Filter by date + search
   const filtered = useMemo(() => {
     const s = q.trim().toLowerCase();
-    return orders.filter((o) => {
+    const result = orders.filter((o) => {
       const created = new Date(o.createdAt);
       if (created < fromDate || created > toDate) return false;
 
       if (!s) return true;
       const id = (o._id || '').toString().slice(-6).toUpperCase();
+      const name = (o.name || o.userName || '').toLowerCase();
       const email = (o.userEmail || '').toLowerCase();
-      const statusStr = (o.status || '').toLowerCase();
-      const paidStr = o.paid ? 'paid' : 'unpaid';
 
       const itemHit = Array.isArray(o.cartProducts)
         ? o.cartProducts.some((it) => (it?.name || '').toLowerCase().includes(s))
@@ -147,15 +153,31 @@ export default function AccountingDashboardPage() {
 
       return (
         id.includes(s) ||
+        name.includes(s) ||
         email.includes(s) ||
-        statusStr.includes(s) ||
-        paidStr.includes(s) ||
         itemHit
       );
     });
+    
+    // Reset to page 1 if search changes
+    return result;
   }, [orders, q, fromDate, toDate]);
 
-  // Aggregates
+  // Reset page when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [q, from, to]);
+
+  // Paginate filtered results
+  const totalItems = filtered.length;
+  const totalPages = Math.ceil(totalItems / pageSize);
+  const paginatedOrders = useMemo(() => {
+    const startIdx = (currentPage - 1) * pageSize;
+    const endIdx = startIdx + pageSize;
+    return filtered.slice(startIdx, endIdx);
+  }, [filtered, currentPage, pageSize]);
+
+  // Aggregates (based on filtered, not paginated)
   const { sales, received, unpaidCount, txCount } = useMemo(() => {
     let _sales = 0;
     let _received = 0;
@@ -249,36 +271,52 @@ export default function AccountingDashboardPage() {
       .filter(order => order.userEmail === customerEmail)
       .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
     
+    // Get customer name from the first order
+    const customerName = customerOrders[0]?.name || customerOrders[0]?.userName || 'N/A';
+    
     setSelectedCustomer({
+      name: customerName,
       email: customerEmail,
       orders: customerOrders
     });
   };
 
-  // Archive transaction
-  const archiveTransaction = async (orderId) => {
-    if (!confirm('Archive this transaction? It will be hidden from the dashboard.')) return;
-    
-    try {
-      const res = await fetch('/api/orders', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          _id: orderId,
-          archived: true,
-          archivedAt: new Date(),
-          archivedBy: session?.user?.email
-        }),
-      });
-      
-      if (!res.ok) throw new Error('Failed to archive');
-      
-      toast.success('Transaction archived successfully');
-      fetchOrders(); // Refresh data
-    } catch (error) {
-      console.error('Error archiving:', error);
-      toast.error('Failed to archive transaction');
+  const handlePageChange = (newPage) => {
+    if (newPage >= 1 && newPage <= totalPages) {
+      setCurrentPage(newPage);
     }
+  };
+
+  // Calculate page numbers for pagination
+  const getPageNumbers = () => {
+    const pages = [];
+    const maxVisible = 5;
+    
+    if (totalPages <= maxVisible) {
+      for (let i = 1; i <= totalPages; i++) {
+        pages.push(i);
+      }
+    } else {
+      if (currentPage <= 3) {
+        for (let i = 1; i <= 4; i++) pages.push(i);
+        pages.push('...');
+        pages.push(totalPages);
+      } else if (currentPage >= totalPages - 2) {
+        pages.push(1);
+        pages.push('...');
+        for (let i = totalPages - 3; i <= totalPages; i++) pages.push(i);
+      } else {
+        pages.push(1);
+        pages.push('...');
+        pages.push(currentPage - 1);
+        pages.push(currentPage);
+        pages.push(currentPage + 1);
+        pages.push('...');
+        pages.push(totalPages);
+      }
+    }
+    
+    return pages;
   };
 
   const printPage = () => window.print();
@@ -302,13 +340,12 @@ export default function AccountingDashboardPage() {
 
         return {
           'Order ID': `#${order._id?.slice(-6).toUpperCase()}`,
-          'Customer Name': order.userName || 'N/A',
+          'Customer Name': order.name || order.userName || 'N/A',
           'Customer Email': order.userEmail,
           'Activities (Items Purchased)': items,
           'Date': orderDate.toLocaleDateString('en-PH'),
           'Time': orderDate.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', hour12: true }),
           'Amount': order.totalPrice || calcOrderTotal(order),
-          'Status': order.paid ? 'Paid' : 'Unpaid',
         };
       });
 
@@ -324,7 +361,6 @@ export default function AccountingDashboardPage() {
         { wch: 12 }, // Date
         { wch: 10 }, // Time
         { wch: 12 }, // Amount
-        { wch: 10 }, // Status
       ];
 
       const wb = XLSX.utils.book_new();
@@ -390,7 +426,7 @@ export default function AccountingDashboardPage() {
           </div>
         </div>
 
-        {/* Filter Type Buttons + Date Filters + Search */}
+        {/* Filter Type Buttons + Date Filters */}
         <div className="no-print mb-4 space-y-3">
           {/* Filter Type Buttons */}
           <div className="flex gap-2">
@@ -426,8 +462,8 @@ export default function AccountingDashboardPage() {
             </span>
           </div>
 
-          {/* Date inputs and search */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {/* Date inputs */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <div className="flex items-center gap-2">
               <label className="text-sm text-slate-600 w-16">From</label>
               <input
@@ -452,12 +488,6 @@ export default function AccountingDashboardPage() {
                 className="border rounded-lg px-3 py-2 w-full cursor-pointer focus:ring-2 focus:ring-[#A5724A] focus:border-[#A5724A]"
               />
             </div>
-            <input
-              value={q}
-              onChange={(e) => setQ(e.target.value)}
-              placeholder="Search (order id, email, item, paid/unpaid, status)…"
-              className="border rounded-lg px-3 py-2 w-full outline-none focus:ring-2 focus:ring-[#A5724A] focus:border-[#A5724A]"
-            />
           </div>
         </div>
 
@@ -513,6 +543,39 @@ export default function AccountingDashboardPage() {
           </div>
         </div>
 
+        {/* Search and Pagination Controls */}
+        <div className="no-print mb-4 space-y-3">
+          <input
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="Search by order ID, customer name, or item..."
+            className="border rounded-lg px-4 py-2 w-full outline-none focus:ring-2 focus:ring-[#A5724A] focus:border-[#A5724A]"
+          />
+          
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <label className="text-sm text-zinc-600">Show:</label>
+              <select
+                className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-sm text-zinc-700 focus:outline-none focus:ring-2 focus:ring-[#A5724A]"
+                value={pageSize}
+                onChange={(e) => {
+                  setPageSize(Number(e.target.value));
+                  setCurrentPage(1);
+                }}
+              >
+                {PAGE_SIZE_OPTIONS.map((size) => (
+                  <option key={size} value={size}>
+                    {size} per page
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="text-sm text-zinc-600">
+              Total: <strong>{totalItems}</strong> transactions
+            </div>
+          </div>
+        </div>
+
         {/* Dropdown / Accordion toggle */}
         <div className="no-print mb-3">
           <button
@@ -530,7 +593,7 @@ export default function AccountingDashboardPage() {
         {showTable && (
           <div
             id="transactions-panel"
-            className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden"
+            className="bg-white border border-slate-200 rounded-xl shadow-sm overflow-hidden mb-4"
           >
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -539,62 +602,46 @@ export default function AccountingDashboardPage() {
                     <th className="text-left w-32">Date</th>
                     <th className="text-left w-20">Time</th>
                     <th className="text-left w-28">Order</th>
-                    <th className="text-left">Customer</th>
-                    <th className="text-left w-28">Status</th>
-                    <th className="text-left w-24">Paid</th>
+                    <th className="text-left">Customer Name</th>
                     <th className="text-right w-32">Amount</th>
-                    <th className="text-center w-24">Actions</th>
+                    <th className="text-center w-32">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {loading ? (
                     <tr>
-                      <td colSpan={8} className="py-6 text-center text-slate-500">
+                      <td colSpan={6} className="py-6 text-center text-slate-500">
                         Loading…
                       </td>
                     </tr>
-                  ) : filtered.length === 0 ? (
+                  ) : paginatedOrders.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="py-8 text-center text-slate-500">
-                        No transactions for this filter.
+                      <td colSpan={6} className="py-8 text-center text-slate-500">
+                        No transactions found.
                       </td>
                     </tr>
                   ) : (
-                    filtered.map((o) => {
+                    paginatedOrders.map((o) => {
                       const d = new Date(o.createdAt);
                       const date = d.toLocaleDateString('en-PH');
                       const time = d.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit' });
                       const id = (o._id || '').toString().slice(-6).toUpperCase();
                       const amt = calcOrderTotal(o);
+                      const customerName = o.name || o.userName || 'N/A';
                       return (
                         <tr key={o._id} className="hover:bg-slate-50">
                           <td className="py-2 px-3">{date}</td>
                           <td className="py-2 px-3">{time}</td>
                           <td className="py-2 px-3 font-mono">#{id}</td>
-                          <td className="py-2 px-3">
-                            <button
-                              onClick={() => viewCustomerOrders(o.userEmail)}
-                              className="text-[#A5724A] hover:underline font-medium"
-                            >
-                              {o.userEmail || '—'}
-                            </button>
-                          </td>
-                          <td className="py-2 px-3 capitalize">{o.status || '—'}</td>
-                          <td className="py-2 px-3">
-                            <span className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${
-                              o.paid ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                            }`}>
-                              {o.paid ? 'PAID' : 'UNPAID'}
-                            </span>
-                          </td>
+                          <td className="py-2 px-3">{customerName}</td>
                           <td className="py-2 px-3 text-right font-semibold">{peso(amt)}</td>
                           <td className="py-2 px-3 text-center">
-                            <button
-                              onClick={() => archiveTransaction(o._id)}
-                              className="px-3 py-1 text-xs font-medium text-zinc-600 hover:text-zinc-900 hover:bg-zinc-100 rounded-lg transition"
+                            <span
+                              onClick={() => viewCustomerOrders(o.userEmail)}
+                              className="cursor-pointer px-3 py-1 text-sm font-medium text-[#A5724A] hover:text-white hover:bg-[#A5724A] border border-[#A5724A] rounded-lg transition"
                             >
-                              Archive
-                            </button>
+                              View Details
+                            </span>
                           </td>
                         </tr>
                       );
@@ -606,23 +653,71 @@ export default function AccountingDashboardPage() {
           </div>
         )}
 
+        {/* Pagination Controls */}
+        {showTable && totalPages > 1 && (
+          <div className="no-print mb-6 flex items-center justify-between">
+            <div className="text-sm text-zinc-600">
+              Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, totalItems)} of {totalItems}
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage === 1}
+                className="cursor-pointer px-3 py-1.5 rounded-lg border bg-white text-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 transition"
+              >
+                Previous
+              </button>
+              
+              {getPageNumbers().map((page, idx) => (
+                page === '...' ? (
+                  <span key={`ellipsis-${idx}`} className="px-2 text-zinc-500">...</span>
+                ) : (
+                  <span
+                    key={page}
+                    onClick={() => handlePageChange(page)}
+                    className={[
+                      'cursor-pointer px-3 py-1.5 rounded-lg border transition',
+                      currentPage === page
+                        ? 'bg-gradient-to-r from-[#A5724A] to-[#7A4E2A] text-white'
+                        : 'bg-white text-zinc-700 hover:bg-slate-50',
+                    ].join(' ')}
+                  >
+                    {page}
+                  </span>
+                )
+              ))}
+              
+              <button
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={currentPage === totalPages}
+                className="cursor-pointer px-3 py-1.5 rounded-lg border bg-white text-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-slate-50 transition"
+              >
+                Next
+              </button>
+            </div>
+          </div>
+        )}
+
         {/* Customer Orders Modal */}
         {selectedCustomer && (
           <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-xl max-w-4xl w-full max-h-[80vh] overflow-y-auto p-6">
               <div className="flex items-center justify-between mb-6">
                 <h2 className="text-2xl font-bold text-zinc-900">Customer Order History</h2>
-                <button
+                <span
                   onClick={() => setSelectedCustomer(null)}
-                  className="text-zinc-400 hover:text-zinc-600 text-2xl font-bold"
+                  className="cursor-pointer text-zinc-400 hover:text-zinc-600 text-2xl font-bold"
                 >
                   ×
-                </button>
+                </span>
               </div>
 
               <div className="mb-6 p-4 bg-slate-50 rounded-lg">
-                <div className="text-sm text-zinc-600">Customer Email</div>
-                <div className="text-lg font-semibold text-zinc-900">{selectedCustomer.email}</div>
+                <div className="text-sm text-zinc-600">Customer Name</div>
+                <div className="text-lg font-semibold text-zinc-900">{selectedCustomer.name}</div>
+                <div className="mt-1 text-sm text-zinc-600">
+                  Email: <span className="font-medium">{selectedCustomer.email}</span>
+                </div>
                 <div className="mt-2 text-sm text-zinc-600">
                   Total Orders: <span className="font-semibold">{selectedCustomer.orders?.length || 0}</span>
                 </div>

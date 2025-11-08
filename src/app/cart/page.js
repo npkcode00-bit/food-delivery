@@ -2,6 +2,7 @@
 'use client';
 
 import { useContext, useEffect, useMemo, useState } from 'react';
+import { useSession } from 'next-auth/react';
 import toast from 'react-hot-toast';
 
 import { CartContext, cartProductPrice } from '../components/AppContext';
@@ -10,7 +11,9 @@ import SectionHeaders from '../components/layout/SectionHeaders';
 import CartProduct from '../components/menu/CartProduct';
 
 const peso = (n = 0) =>
-  new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(Number(n || 0));
+  new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(
+    Number(n || 0)
+  );
 
 function cartKey(p) {
   const baseId = p._id || p.id || p.slug || p.name;
@@ -19,15 +22,41 @@ function cartKey(p) {
   return JSON.stringify({ baseId, size, extras });
 }
 
+// Normalize PH mobile number to 10 digits starting with 9 (local part)
+function normalizePhPhone(raw) {
+  if (!raw) return '';
+  let digits = String(raw).replace(/\D/g, '');
+
+  // 09123... => 9123...
+  if (digits.length === 11 && digits.startsWith('0')) {
+    digits = digits.slice(1);
+  }
+
+  // If longer than 10, keep last 10 digits
+  if (digits.length > 10) {
+    digits = digits.slice(-10);
+  }
+
+  // Ideally 10 digits starting with 9
+  if (digits.length === 10 && digits.startsWith('9')) {
+    return digits;
+  }
+
+  return digits;
+}
+
 export default function CartPage() {
-  const { cartProducts = [], addToCart, removeCartProduct, clearCart } = useContext(CartContext);
+  const { cartProducts = [], addToCart, removeCartProduct, clearCart } =
+    useContext(CartContext);
+
+  const { data: session } = useSession();
 
   const [address, setAddress] = useState({
     phone: '',
     streetAddress: '',
     city: '',
     country: 'Philippines',
-    orderMethod: 'pickup', // 👈 canonical field
+    orderMethod: 'pickup', // canonical field
   });
 
   // Handle success/cancel + clear-cart
@@ -53,16 +82,41 @@ export default function CartPage() {
         const parsed = JSON.parse(saved);
         let orderMethod = parsed.orderMethod;
         if (!orderMethod && parsed.fulfillment) {
-          orderMethod = parsed.fulfillment === 'dinein' ? 'dine_in' : parsed.fulfillment; // migrate
+          orderMethod =
+            parsed.fulfillment === 'dinein'
+              ? 'dine_in'
+              : parsed.fulfillment; // migrate
         }
-        setAddress((prev) => ({ ...prev, ...parsed, ...(orderMethod ? { orderMethod } : {}) }));
+        setAddress((prev) => ({
+          ...prev,
+          ...parsed,
+          ...(orderMethod ? { orderMethod } : {}),
+        }));
       } catch {}
     }
   }, []);
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
     window.localStorage.setItem('checkoutAddress', JSON.stringify(address));
   }, [address]);
+
+  // Prefill phone from profile if address.phone is empty
+  useEffect(() => {
+    if (!session) return;
+
+    const rawProfilePhone = session.user?.phone || '';
+    if (!rawProfilePhone) return;
+
+    const normalized = normalizePhPhone(rawProfilePhone);
+    if (!normalized) return;
+
+    setAddress((prev) => {
+      // Don't override if user/localStorage already set a phone
+      if (prev.phone && prev.phone.trim() !== '') return prev;
+      return { ...prev, phone: normalized };
+    });
+  }, [session]);
 
   // Group identical items
   const groups = useMemo(() => {
@@ -82,7 +136,11 @@ export default function CartPage() {
 
   // Totals (align fee with backend default 50 unless you set env)
   const DELIVERY_FEE_PHP = 50;
-  const subtotal = groups.reduce((s, g) => s + cartProductPrice(g.sample) * g.qty, 0) || 0;
+  const subtotal =
+    groups.reduce(
+      (s, g) => s + cartProductPrice(g.sample) * g.qty,
+      0
+    ) || 0;
   const deliveryFee = address.orderMethod === 'delivery' ? DELIVERY_FEE_PHP : 0;
   const grandTotal = subtotal + deliveryFee;
 
@@ -110,12 +168,16 @@ export default function CartPage() {
   async function proceedToCheckout(ev) {
     ev.preventDefault();
 
-    if (!address.phone?.trim()) return toast.error('Phone number is required');
+    if (!address.phone?.trim()) {
+      return toast.error('Phone number is required');
+    }
 
     if (address.orderMethod === 'delivery') {
-      if (!address.streetAddress?.trim()) return toast.error('Street address is required');
+      if (!address.streetAddress?.trim())
+        return toast.error('Street address is required');
       if (!address.city?.trim()) return toast.error('City is required');
-      if (!address.country?.trim()) return toast.error('Country is required');
+      if (!address.country?.trim())
+        return toast.error('Country is required');
     }
 
     // Debug logging - REMOVE AFTER TESTING
@@ -128,11 +190,10 @@ export default function CartPage() {
       fetch('/api/checkout', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        // EXPLICITLY send orderMethod at top level AND inside address
-        body: JSON.stringify({ 
-          address, 
-          cartProducts, 
-          orderMethod: address.orderMethod // 👈 Explicit top-level
+        body: JSON.stringify({
+          address,
+          cartProducts,
+          orderMethod: address.orderMethod,
         }),
       })
         .then(async (response) => {
@@ -184,27 +245,35 @@ export default function CartPage() {
                 lineTotal={itemTotal}
                 onIncrease={() => increaseQty(g)}
                 onDecrease={() => decreaseQty(g)}
-                onEdit={(newSize, newExtras) => editOneInGroup(g, newSize, newExtras)}
+                onEdit={(newSize, newExtras) =>
+                  editOneInGroup(g, newSize, newExtras)
+                }
               />
             );
           })}
 
           <div className="py-2 pr-16 flex justify-end items-center">
             <div className="text-gray-500">
-              Subtotal:<br />
-              {address.orderMethod === 'delivery' ? 'Delivery:' : 'Service:'}<br />
+              Subtotal:
+              <br />
+              {address.orderMethod === 'delivery' ? 'Delivery:' : 'Service:'}
+              <br />
               Total:
             </div>
             <div className="font-semibold pl-2 text-right">
-              {peso(subtotal)}<br />
-              {peso(deliveryFee)}<br />
+              {peso(subtotal)}
+              <br />
+              {peso(deliveryFee)}
+              <br />
               {peso(grandTotal)}
             </div>
           </div>
         </div>
 
         <div className="rounded-2xl border border-white/30 bg-white/70 p-4 shadow-sm backdrop-blur-xl">
-          <h2 className="text-center font-semibold uppercase mb-5">Checkout</h2>
+          <h2 className="text-center font-semibold uppercase mb-5">
+            Checkout
+          </h2>
           <form onSubmit={proceedToCheckout}>
             <AddressInputs
               addressProps={address}
@@ -213,7 +282,7 @@ export default function CartPage() {
             />
             <button
               type="submit"
-              className="mt-2 w-full rounded-full bg-gradient-to-r from-[#A5724A] to-[#7A4E2A] px-5 py-2.5 font-semibold text-white shadow-md shadow-[#A5724A]/20 hover:shadow-[#A5724A]/40 cursor-pointer"
+              className="mt-2 w-full rounded-full px-5 py-2.5 font-semibold text-white shadow-md shadow-[#A5724A]/20 hover:shadow-[#A5724A]/40 cursor-pointer"
             >
               Pay {peso(grandTotal)}
             </button>

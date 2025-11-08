@@ -20,8 +20,32 @@ function normalizeOrderMethod(val) {
   if (!val) return 'pickup';
   const s = String(val).toLowerCase().replace(/-/g, '_');
   if (s === 'dinein') return 'dine_in';
-  if (['pickup','dine_in','delivery'].includes(s)) return s;
+  if (['pickup', 'dine_in', 'delivery'].includes(s)) return s;
   return 'pickup';
+}
+
+// Normalize PH mobile number to 10 digits starting with 9 (local part)
+function normalizePhPhone(raw) {
+  if (!raw) return '';
+  let digits = String(raw).replace(/\D/g, '');
+
+  // If it’s 11 digits and starts with 0, drop the 0 (09123... -> 9123...)
+  if (digits.length === 11 && digits.startsWith('0')) {
+    digits = digits.slice(1);
+  }
+
+  // If longer than 10, keep the last 10 digits
+  if (digits.length > 10) {
+    digits = digits.slice(-10);
+  }
+
+  // At this point we *hope* it's 10 digits and starts with 9
+  if (digits.length === 10 && digits.startsWith('9')) {
+    return digits;
+  }
+
+  // Fallback: still return whatever we have, PayMongo will validate further if needed
+  return digits;
 }
 
 export async function POST(req) {
@@ -31,18 +55,15 @@ export async function POST(req) {
     const body = await req.json();
     const { cartProducts = [], address = {} } = body;
 
-    // Debug logging - REMOVE THESE AFTER TESTING
     console.log('=== CHECKOUT REQUEST ===');
     console.log('body.orderMethod:', body.orderMethod);
     console.log('address.orderMethod:', address.orderMethod);
     console.log('address.fulfillment:', address.fulfillment);
 
-    // Accept multiple possible locations for orderMethod
-    // Priority: body.orderMethod > address.orderMethod > address.fulfillment
     const orderMethod = normalizeOrderMethod(
       body.orderMethod || address.orderMethod || address.fulfillment || 'pickup'
     );
-    
+
     console.log('Final normalized orderMethod:', orderMethod);
     console.log('=======================');
 
@@ -50,19 +71,51 @@ export async function POST(req) {
       return Response.json({ error: 'Cart is empty' }, { status: 400 });
     }
 
-    // Logged-in user (optional)
+    // -------- Get user info from NextAuth session --------
     let userEmail = '';
+    let userName = '';
+    let userPhone = '';
+
     try {
       const session = await getServerSession(authOptions);
-      userEmail = session?.user?.email || '';
-    } catch {}
 
-    const billingEmail = userEmail || address?.email || '';
-    if (!billingEmail) {
-      return Response.json({ error: 'Email is required for checkout' }, { status: 400 });
+      userEmail = session?.user?.email || '';
+
+      // Try multiple shapes: name OR firstName + lastName
+      const fullNameFromParts = [
+        session?.user?.firstName,
+        session?.user?.lastName,
+      ]
+        .filter(Boolean)
+        .join(' ')
+        .trim();
+
+      userName = session?.user?.name || fullNameFromParts || '';
+
+      userPhone = session?.user?.phone || '';
+    } catch {
+      // ignore if no session
     }
 
-    // Build line items & compute total
+    // Email priority: session -> address.email -> body.email
+    const billingEmail =
+      userEmail || address?.email || body?.email || '';
+    if (!billingEmail) {
+      return Response.json(
+        { error: 'Email is required for checkout' },
+        { status: 400 }
+      );
+    }
+
+    // Name priority: session full name -> fallback "Customer"
+    const billingName = userName || 'Customer';
+
+    // Phone priority: checkout phone (address.phone) -> profile phone
+    const billingPhone = normalizePhPhone(
+      address?.phone || userPhone || ''
+    );
+
+    // -------- Build line items & total --------
     const lineItems = [];
     const enrichedCartProducts = [];
     let totalPrice = 0;
@@ -124,7 +177,9 @@ export async function POST(req) {
         amount: toCentavos(productPrice),
         currency: 'PHP',
         name: enrichedProduct.name,
-        description: productInfo.description ? String(productInfo.description).slice(0, 250) : undefined,
+        description: productInfo.description
+          ? String(productInfo.description).slice(0, 250)
+          : undefined,
         quantity: 1,
       });
     }
@@ -143,19 +198,19 @@ export async function POST(req) {
 
     console.log('Creating CheckoutIntent with orderMethod:', orderMethod);
 
-    // Create CheckoutIntent (EXPLICITLY SET orderMethod)
+    // -------- Create CheckoutIntent --------
     const intent = await CheckoutIntent.create({
       userEmail: billingEmail,
       address: {
-        name: address?.name || '',
-        phone: address?.phone || '',
+        name: billingName,
+        phone: billingPhone,
         streetAddress: address?.streetAddress || '',
         city: address?.city || '',
         country: address?.country || 'PH',
         email: billingEmail,
         fulfillment: address?.fulfillment || undefined,
       },
-      orderMethod: orderMethod, // 👈 EXPLICIT SET
+      orderMethod,
       cartProducts: enrichedCartProducts,
       lineItems,
       totalPrice,
@@ -165,36 +220,39 @@ export async function POST(req) {
     console.log('CheckoutIntent created:', {
       id: intent._id,
       orderMethod: intent.orderMethod,
-      totalPrice: intent.totalPrice
+      totalPrice: intent.totalPrice,
+      billingName,
+      billingEmail,
+      billingPhone,
     });
 
     const intentId = String(intent._id);
 
-    // URLs
-    const envOrigin = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL;
+    // -------- Base URL for redirects --------
+    const envOrigin =
+      process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_APP_URL;
     const origin = envOrigin || new URL(req.url).origin;
     const base = origin.endsWith('/') ? origin : origin + '/';
 
-    // PayMongo Checkout Session
+    // -------- PayMongo checkout session payload --------
     const payload = {
       data: {
         attributes: {
           payment_method_types: ['gcash'],
           description: `CheckoutIntent ${intentId}`,
           reference_number: intentId,
-          metadata: { 
-            intentId, 
-            orderMethod // 👈 Also include in metadata for redundancy
+          metadata: {
+            intentId,
+            orderMethod,
           },
-
           line_items: lineItems,
           send_email_receipt: true,
           success_url: `${base}orders?intent=${intentId}&clear-cart=1`,
           cancel_url: `${base}cart?payment=failed&intent=${intentId}`,
           billing: {
-            name: address?.name || 'Customer',
+            name: billingName,
             email: billingEmail,
-            phone: address?.phone || '',
+            phone: billingPhone,
             address: {
               line1: address?.streetAddress || '',
               city: address?.city || '',
@@ -207,7 +265,10 @@ export async function POST(req) {
 
     const secret = process.env.PAYMONGO_SECRET_KEY;
     if (!secret) {
-      return Response.json({ error: 'PAYMONGO_SECRET_KEY missing' }, { status: 500 });
+      return Response.json(
+        { error: 'PAYMONGO_SECRET_KEY missing' },
+        { status: 500 }
+      );
     }
     const auth = Buffer.from(`${secret}:`).toString('base64');
 
@@ -224,14 +285,20 @@ export async function POST(req) {
     const data = await resp.json();
     if (!resp.ok) {
       console.error('PayMongo error:', data);
-      return Response.json({ error: 'PayMongo checkout failed', details: data }, { status: 502 });
+      return Response.json(
+        { error: 'PayMongo checkout failed', details: data },
+        { status: 502 }
+      );
     }
 
     const checkoutUrl = data?.data?.attributes?.checkout_url;
     const checkoutSessionId = data?.data?.id;
 
     if (!checkoutUrl) {
-      return Response.json({ error: 'No checkout_url from PayMongo' }, { status: 502 });
+      return Response.json(
+        { error: 'No checkout_url from PayMongo' },
+        { status: 502 }
+      );
     }
 
     if (checkoutSessionId) {

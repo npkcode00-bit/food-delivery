@@ -28,7 +28,7 @@ export default function Hero({ insideBox = false }) {
               <a
                   href="/menu"
                   className="group inline-flex items-center gap-2 rounded-full border border-[#B08B62]/40
-                            bg-gradient-to-r from-[#A5724A] to-[#7A4E2A] px-6 py-2.5 text-white
+                            bg-[#AB886D] px-6 py-2.5 text-white
                             shadow-lg shadow-[#A5724A]/25 transition
                             hover:shadow-[#A5724A]/40
                             focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8B5E34]/60"

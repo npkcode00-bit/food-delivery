@@ -44,7 +44,7 @@ const UserSchema = new Schema(
     // Role management
     role: {
       type: String,
-      enum: ['customer', 'admin', 'accounting', 'cashier'],
+      enum: ['customer', 'admin', 'accounting', 'cashier', 'superadmin'],
       default: 'customer',
       index: true,
     },
@@ -56,6 +56,13 @@ const UserSchema = new Schema(
 
     // Email verification
     isEmailVerified: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+
+    // Archive status
+    archived: {
       type: Boolean,
       default: false,
       index: true,
@@ -88,7 +95,8 @@ UserSchema.pre('save', async function (next) {
     this.password = await bcrypt.hash(this.password, salt);
   }
   if (this.isModified('role')) {
-    this.admin = this.role === 'admin';
+    // Set admin flag for both admin and superadmin
+    this.admin = this.role === 'admin' || this.role === 'superadmin';
   }
   next();
 });

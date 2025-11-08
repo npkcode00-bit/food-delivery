@@ -21,17 +21,21 @@ export default function AddressInputs({
   // Determine if address should be hidden or disabled
   const shouldHideAddress =
     typeof hideAddress === 'boolean' ? hideAddress : false;
-  
+
   const addressDisabled =
-    typeof disableAddress === 'boolean' ? disableAddress : orderMethod !== 'delivery';
+    typeof disableAddress === 'boolean'
+      ? disableAddress
+      : orderMethod !== 'delivery';
 
   return (
     <>
-      <label className="block text-sm font-medium text-zinc-700 mb-1">Order method</label>
+      <label className="block text-sm font-medium text-zinc-700 mb-1">
+        Order method
+      </label>
       <div className="w-full gap-2 mb-4 inline-flex rounded-xl border border-zinc-300 bg-white p-1">
         {[
-          { k: 'pickup',   label: 'Pick-up' },
-          { k: 'dine_in',  label: 'Dine-in' },
+          { k: 'pickup', label: 'Pick-up' },
+          { k: 'dine_in', label: 'Dine-in' },
           { k: 'delivery', label: 'Delivery' },
         ].map(({ k, label }) => {
           const active = orderMethod === k;
@@ -43,7 +47,9 @@ export default function AddressInputs({
               aria-pressed={active}
               className={[
                 'cursor-pointer w-full text-center rounded-lg px-4 py-2 text-sm font-semibold transition',
-                active ? 'bg-[#AB886D] text-white shadow' : 'text-[#AB886D] border-2 shadow hover:bg-zinc-50',
+                active
+                  ? 'bg-[#AB886D] text-white shadow'
+                  : 'text-[#AB886D] border-2 shadow hover:bg-zinc-50',
               ].join(' ')}
             >
               {label}
@@ -52,7 +58,9 @@ export default function AddressInputs({
         })}
       </div>
 
-      <label className="block text-sm font-medium text-zinc-700">Phone *</label>
+      <label className="block text-sm font-medium text-zinc-700">
+        Phone *
+      </label>
       <input
         type="text"
         placeholder="9xxxxxxxxx"
@@ -85,8 +93,7 @@ export default function AddressInputs({
             onChange={(e) => setAddressProp('streetAddress', e.target.value)}
           />
 
-          <div className="grid  gap-2">
-           
+          <div className="grid gap-2">
             <div>
               <label className="block w-full text-sm font-medium text-zinc-700">
                 City {orderMethod === 'delivery' && '*'}
