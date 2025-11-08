@@ -17,24 +17,14 @@ export default function MenuPage() {
   const isAccounting =
     session?.user?.accounting === true || role === 'accounting';
 
-  // 🚫 Block accounting users from this page
-  if (status === 'authenticated' && isAccounting) {
-    return (
-      <section className="max-w-3xl mx-auto mt-16 text-center">
-        <SectionHeaders
-          mainHeader="Menu not available"
-          subHeader="The customer menu is hidden for accounting users."
-        />
-        <p className="mt-4 text-sm text-zinc-600">
-          Please use the <span className="font-semibold">Accounting</span> or{' '}
-          <span className="font-semibold">Orders</span> sections to manage
-          reports and transactions.
-        </p>
-      </section>
-    );
-  }
-
+  // ✅ Move ALL hooks to the top, before any early returns
   useEffect(() => {
+    // Don't fetch if user is accounting
+    if (status === 'authenticated' && isAccounting) {
+      setLoading(false);
+      return;
+    }
+
     let alive = true;
 
     (async () => {
@@ -70,7 +60,7 @@ export default function MenuPage() {
       alive = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [status, isAccounting]);
 
   useEffect(() => {
     if (!categories.length) return;
@@ -91,6 +81,23 @@ export default function MenuPage() {
     () => menuItems.filter((item) => item.category === selectedCategoryId),
     [menuItems, selectedCategoryId]
   );
+
+  // ✅ NOW do the early return after all hooks
+  if (status === 'authenticated' && isAccounting) {
+    return (
+      <section className="max-w-3xl mx-auto mt-16 text-center">
+        <SectionHeaders
+          mainHeader="Menu not available"
+          subHeader="The customer menu is hidden for accounting users."
+        />
+        <p className="mt-4 text-sm text-zinc-600">
+          Please use the <span className="font-semibold">Accounting</span> or{' '}
+          <span className="font-semibold">Orders</span> sections to manage
+          reports and transactions.
+        </p>
+      </section>
+    );
+  }
 
   return (
     <section className="relative">

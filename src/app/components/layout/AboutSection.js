@@ -16,7 +16,7 @@ export default function AboutSection() {
         </p>
         
         {/* Read More Button */}
-        <a
+        <button
           onClick={() => setShowModal(true)}
           className="cursor-pointer mt-6 inline-flex items-center gap-2 rounded-full border border-zinc-300/60 bg-white/80 px-6 py-2.5 font-semibold text-zinc-700 backdrop-blur-md transition hover:border-zinc-400 hover:bg-white/90 focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-400/60"
         >
@@ -28,7 +28,7 @@ export default function AboutSection() {
             />
           </svg>
           <span>Read Our Full Story</span>
-        </a>
+        </button>
       </section>
 
       {/* Modal */}
@@ -42,13 +42,13 @@ export default function AboutSection() {
             onClick={(e) => e.stopPropagation()}
           >
             {/* Close button */}
-            <span
+            <button
               onClick={() => setShowModal(false)}
               className="cursor-pointer absolute top-4 right-4 text-zinc-400 hover:text-zinc-600 text-2xl font-bold"
               aria-label="Close modal"
             >
               ×
-            </span>
+            </button>
 
             {/* Modal Content */}
             <div className="pr-8">
@@ -58,12 +58,12 @@ export default function AboutSection() {
               <div className="space-y-4 text-zinc-700 leading-relaxed">
                 <p>
                   <strong className="text-[#A5724A]">Pngpl Café</strong>, established in <strong>September 2023</strong>, 
-                  began as a small rental catering business inspired by the owner's dream of creating a faith-based café.
+                  began as a small rental catering business inspired by the owner&apos;s dream of creating a faith-based café.
                 </p>
                 
                 <p>
-                  The name <strong>"Pngpl,"</strong> derived from the Tagalog word <em>pinagpala</em> (meaning <strong>"blessed"</strong>), 
-                  reflects the owner's religious values and the blessing they hope to share with every cup served.
+                  The name <strong>&quot;Pngpl,&quot;</strong> derived from the Tagalog word <em>pinagpala</em> (meaning <strong>&quot;blessed&quot;</strong>), 
+                  reflects the owner&apos;s religious values and the blessing they hope to share with every cup served.
                 </p>
                 
                 <p>
@@ -78,7 +78,7 @@ export default function AboutSection() {
 
                 <div className="mt-6 pt-6 border-t border-zinc-200">
                   <p className="text-sm text-zinc-500 italic text-center">
-                    "Every cup is blessed. Every customer is family." ☕
+                    &quot;Every cup is blessed. Every customer is family.&quot; ☕
                   </p>
                 </div>
               </div>
