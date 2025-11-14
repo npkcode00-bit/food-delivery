@@ -27,7 +27,7 @@ function AuthLinks({ status, userFirstName, userName }) {
         )}
         <button
           onClick={() => signOut()}
-          className="bg-primary rounded-full text-white px-6 py-2 cursor-pointer"
+          className="bg-primary rounded-full text-white px-6 py-2 cursor-pointer whitespace-nowrap"
           style={{ color: 'white' }}
         >
           Logout
@@ -39,7 +39,7 @@ function AuthLinks({ status, userFirstName, userName }) {
   return (
     <>
       <Link
-        className="rounded-full px-6 py-2 border-2 cursor-pointer"
+        className="rounded-full px-6 py-2 border-2 cursor-pointer whitespace-nowrap"
         style={{
           color: '#AB886D',
           backgroundColor: 'transparent',
@@ -51,7 +51,7 @@ function AuthLinks({ status, userFirstName, userName }) {
       </Link>
       <Link
         href="/register"
-        className="bg-primary rounded-full text-white px-6 py-2 cursor-pointer"
+        className="bg-primary rounded-full text-white px-6 py-2 cursor-pointer whitespace-nowrap"
         style={{ color: 'white' }}
       >
         Register
@@ -110,7 +110,6 @@ export default function Header() {
     { label: 'Home', href: '/', show: showHome },
     { label: 'Inventory', href: '/inventory', show: canSeeInventory },
     { label: 'Items', href: '/admin', show: isAdmin },
-    // 👇 Hide Menu for accounting (and still hide for cashier)
     {
       label: 'Menu',
       href: '/menu',
@@ -131,12 +130,9 @@ export default function Header() {
   };
 
   return (
-    <header 
-      className="border-b shadow-sm"
-
-    >
+    <header className="border-b bg-transparent">
       <div className="mx-auto px-4 sm:px-6 lg:px-8 py-3 md:py-4">
-        {/* Top bar (logo + toggles) - mobile */}
+        {/* Top bar (logo + toggles) - mobile only */}
         <div className="flex items-center md:hidden justify-between gap-3">
           <img src="/logo.png" alt="Logo" className="w-40 max-w-full h-auto" />
           <div className="flex gap-3 items-center">
@@ -174,7 +170,7 @@ export default function Header() {
             })}
 
             {/* Auth */}
-            <div className="pt-2 border-t mt-2">
+            <div className="pt-2 border-t mt-2 flex flex-col gap-2">
               <AuthLinks
                 status={status}
                 userFirstName={userFirstName}
@@ -184,13 +180,13 @@ export default function Header() {
           </div>
         )}
 
-        {/* Desktop header */}
-        <div className="hidden md:flex items-center justify-between">
-          <nav className="flex items-center gap-6 text-gray-600 font-semibold">
+        {/* Desktop header - HIDDEN ON MOBILE */}
+        <div className="hidden md:flex items-center justify-between gap-4">
+          <div className="flex items-center gap-2 lg:gap-4 xl:gap-6 text-gray-600 font-semibold">
             <img
               src="/logo.png"
               alt="Logo"
-              className="w-56 lg:w-72 max-w-full h-auto"
+              className="w-40 lg:w-56 xl:w-64 max-w-full h-auto flex-shrink-0"
             />
 
             {navItems.map((item) => {
@@ -199,7 +195,7 @@ export default function Header() {
                 <Link
                   key={item.href}
                   href={item.href}
-                  className={`px-4 py-2 rounded-lg cursor-pointer transition ${
+                  className={`px-2 lg:px-3 xl:px-4 py-2 rounded-lg cursor-pointer transition whitespace-nowrap text-sm lg:text-base ${
                     active
                       ? 'bg-gradient-to-r from-[#A5724A] to-[#7A4E2A] text-white font-bold shadow-md'
                       : 'hover:bg-white/60 hover:text-[#7A4E2A]'
@@ -209,9 +205,9 @@ export default function Header() {
                 </Link>
               );
             })}
-          </nav>
+          </div>
 
-          <nav className="flex items-center gap-4 text-gray-600 font-semibold">
+          <div className="flex items-center gap-2 lg:gap-4 text-gray-600 font-semibold flex-shrink-0">
             <AuthLinks
               status={status}
               userFirstName={userFirstName}
@@ -219,7 +215,7 @@ export default function Header() {
             />
             {/* Cart only for authenticated customers */}
             {isAuthed && isCustomer && <CartLink count={cartCount} />}
-          </nav>
+          </div>
         </div>
       </div>
     </header>
