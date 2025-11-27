@@ -44,11 +44,29 @@ const UserSchema = new Schema(
     // Role management
     role: {
       type: String,
-      enum: ['customer', 'admin', 'accounting', 'cashier', 'superadmin'],
+      // 👇 rider added here
+      enum: ['customer', 'admin', 'accounting', 'cashier', 'rider', 'superadmin'],
       default: 'customer',
       index: true,
     },
+
+    // Convenience flags (used in session / permissions)
     admin: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    accounting: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    cashier: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    rider: {
       type: Boolean,
       default: false,
       index: true,
@@ -88,16 +106,21 @@ UserSchema.virtual('fullName').get(function () {
   return [this.firstName, this.lastName].filter(Boolean).join(' ');
 });
 
-// Hash password if changed
+// Hash password if changed + keep role flags in sync
 UserSchema.pre('save', async function (next) {
   if (this.isModified('password')) {
     const salt = await bcrypt.genSalt(10);
     this.password = await bcrypt.hash(this.password, salt);
   }
+
   if (this.isModified('role')) {
-    // Set admin flag for both admin and superadmin
-    this.admin = this.role === 'admin' || this.role === 'superadmin';
+    const r = this.role;
+    this.admin = r === 'admin' || r === 'superadmin';
+    this.accounting = r === 'accounting';
+    this.cashier = r === 'cashier';
+    this.rider = r === 'rider';
   }
+
   next();
 });
 

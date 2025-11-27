@@ -5,7 +5,13 @@ import AdminUsersClient from '../components/layout/AdminUsersClient';
 
 export default async function AdminUsersPage() {
   const session = await getServerSession(authOptions);
-  if (!session?.user?.admin) redirect('/');
+  const role = session?.user?.role;
+  const isAdmin =
+    session?.user?.admin === true ||
+    role === 'admin' ||
+    role === 'superadmin';
+
+  if (!isAdmin) redirect('/');
 
   return (
     <section className="relative">

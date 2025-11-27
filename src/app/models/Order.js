@@ -38,15 +38,15 @@ const OrderSchema = new mongoose.Schema(
         'placed',
         'in_kitchen',
         'cancelled',
-        
+
         // Delivery-specific
         'on_the_way',
         'delivered',
-        
+
         // Pickup-specific
         'ready_for_pickup',
         'picked_up',
-        
+
         // Dine-in-specific
         'served',
         'completed',
@@ -62,7 +62,17 @@ const OrderSchema = new mongoose.Schema(
 
     notes: String,
 
-    // ✅ NEW: Archive fields
+    // ✅ Rider-related fields
+    riderId: { type: String },            // we’ll store user._id or email here
+    riderName: { type: String },
+    riderEmail: { type: String },
+    riderDeclined: [{ type: String }],    // optional list of riderIds who declined
+
+    // ✅ Proof of delivery
+    deliveryProofUrl: { type: String },   // image URL
+    deliveredAt: { type: Date },          // when rider completed delivery
+
+    // ✅ Archive fields
     archived: {
       type: Boolean,
       default: false,

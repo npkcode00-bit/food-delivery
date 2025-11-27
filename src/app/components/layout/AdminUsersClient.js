@@ -9,6 +9,7 @@ const ROLE_OPTIONS = [
   { value: 'customer',   label: 'Customer' },
   { value: 'accounting', label: 'Accounting' },
   { value: 'cashier',    label: 'Cashier' },
+  { value: 'rider',      label: 'Rider' },       // ✅ NEW
   { value: 'admin',      label: 'Admin' },
   { value: 'superadmin', label: 'Super Admin' },
 ];
@@ -96,7 +97,7 @@ export default function AdminUsersClient() {
       phone: user.phone || '',
       email: user.email || '',
       role: user.role || (user.admin ? 'admin' : 'customer'),
-      isOwnAccount: session?.user?.email === user.email, // Check if editing own account
+      isOwnAccount: session?.user?.email === user.email,
     });
   };
   const onCloseEdit = () => setEditing(null);
@@ -235,12 +236,26 @@ export default function AdminUsersClient() {
     return true;
   };
 
-  // Get role display with badge
+  // Get role display with badge (now including Rider)
   const getRoleBadge = (role) => {
     if (role === 'superadmin') {
       return (
         <span className="inline-block rounded-full border-2 border-red-500 bg-red-50 px-3 py-0.5 text-xs font-bold text-red-700">
           🛡️ Super Admin
+        </span>
+      );
+    }
+    if (role === 'admin') {
+      return (
+        <span className="inline-block rounded-full border-2 border-blue-500 bg-blue-50 px-3 py-0.5 text-xs font-bold text-blue-700">
+          Admin
+        </span>
+      );
+    }
+    if (role === 'rider') {
+      return (
+        <span className="inline-block rounded-full border-2 border-emerald-500 bg-emerald-50 px-3 py-0.5 text-xs font-bold text-emerald-700">
+          🚚 Rider
         </span>
       );
     }
@@ -251,13 +266,16 @@ export default function AdminUsersClient() {
     );
   };
 
-  // Filter role options based on current user
+  // Role options allowed in the ROLE select
   const getAvailableRoleOptions = () => {
     if (isSuperAdmin) {
+      // all roles except 'all'
       return ROLE_OPTIONS.filter(r => r.value !== 'all');
     }
-    // Regular admins cannot see/assign super admin
-    return ROLE_OPTIONS.filter(r => r.value !== 'all' && r.value !== 'superadmin');
+    // Regular admins cannot assign superadmin
+    return ROLE_OPTIONS.filter(
+      r => r.value !== 'all' && r.value !== 'superadmin'
+    );
   };
 
   return (
@@ -334,7 +352,7 @@ export default function AdminUsersClient() {
         <div className="mb-4 flex gap-2">
           <span
             onClick={() => setViewMode('active')}
-            style={{border:'1px solid gray'}}
+            style={{ border: '1px solid gray' }}
             className={[
               'w-full cursor-pointer text-center px-4 py-2 rounded-lg font-semibold transition',
               viewMode === 'active'
@@ -346,7 +364,7 @@ export default function AdminUsersClient() {
           </span>
           <span
             onClick={() => setViewMode('archived')}
-            style={{border:'1px solid gray'}}
+            style={{ border: '1px solid gray' }}
             className={[
               'w-full cursor-pointer text-center px-4 py-2 rounded-lg font-semibold transition',
               viewMode === 'archived'
@@ -414,7 +432,9 @@ export default function AdminUsersClient() {
                     <td className="px-4 py-3">{u.phone || ''}</td>
                     <td className="px-4 py-3">{u.address || ''}</td>
                     <td className="px-4 py-3">{getRoleBadge(u.role)}</td>
-                    <td className="px-4 py-3">{new Date(u.createdAt).toLocaleString()}</td>
+                    <td className="px-4 py-3">
+                      {u.createdAt ? new Date(u.createdAt).toLocaleString() : ''}
+                    </td>
                     <td className="px-4 py-3 space-x-2">
                       {viewMode === 'active' ? (
                         <>
@@ -468,8 +488,9 @@ export default function AdminUsersClient() {
             <div className="flex items-center gap-1">
               <span
                 onClick={() => handlePageChange(currentPage - 1)}
-                disabled={currentPage === 1}
-                className="cursor-pointer px-3 py-1.5 rounded-lg border bg-white/80 text-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-white/90 transition"
+                className={`cursor-pointer px-3 py-1.5 rounded-lg border bg-white/80 text-zinc-700 hover:bg-white/90 transition ${
+                  currentPage === 1 ? 'opacity-40 cursor-not-allowed pointer-events-none' : ''
+                }`}
               >
                 Previous
               </span>
@@ -495,8 +516,9 @@ export default function AdminUsersClient() {
               
               <span
                 onClick={() => handlePageChange(currentPage + 1)}
-                disabled={currentPage === totalPages}
-                className="cursor-pointer px-3 py-1.5 rounded-lg border bg-white/80 text-zinc-700 disabled:opacity-40 disabled:cursor-not-allowed hover:bg-white/90 transition"
+                className={`cursor-pointer px-3 py-1.5 rounded-lg border bg-white/80 text-zinc-700 hover:bg-white/90 transition ${
+                  currentPage === totalPages ? 'opacity-40 cursor-not-allowed pointer-events-none' : ''
+                }`}
               >
                 Next
               </span>
@@ -585,11 +607,15 @@ export default function AdminUsersClient() {
                 </div>
               </div>
               <div className="px-5 py-4 border-t flex justify-end gap-2">
-                <button className="border rounded-md px-4 py-2 cursor-pointer" onClick={onCloseEdit} disabled={saving}>
+                <button
+                  className="border rounded-md px-4 py-2 cursor-pointer"
+                  onClick={onCloseEdit}
+                  disabled={saving}
+                >
                   Cancel
                 </button>
                 <span
-                  style={{borderRadius:'10px'}}
+                  style={{ borderRadius: '10px' }}
                   className="bg-primary w-full text-center border-1 text-white rounded-md px-4 py-2 disabled:opacity-60 cursor-pointer"
                   onClick={onSave}
                 >
@@ -623,7 +649,11 @@ export default function AdminUsersClient() {
                 </p>
               </div>
               <div className="px-5 py-4 border-t flex justify-end gap-2">
-                <button className="border rounded-md px-4 py-2 cursor-pointer" onClick={onCancelArchive} disabled={archiving}>
+                <button
+                  className="border rounded-md px-4 py-2 cursor-pointer"
+                  onClick={onCancelArchive}
+                  disabled={archiving}
+                >
                   Cancel
                 </button>
                 <span
@@ -655,7 +685,11 @@ export default function AdminUsersClient() {
                 </p>
               </div>
               <div className="px-5 py-4 border-t flex justify-end gap-2">
-                <button className="border rounded-md px-4 py-2 cursor-pointer" onClick={onCancelRestore} disabled={restoring}>
+                <button
+                  className="border rounded-md px-4 py-2 cursor-pointer"
+                  onClick={onCancelRestore}
+                  disabled={restoring}
+                >
                   Cancel
                 </button>
                 <span

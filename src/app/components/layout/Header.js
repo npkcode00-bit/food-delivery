@@ -1,4 +1,3 @@
-// src/app/components/layout/Header.js
 'use client';
 
 import { useContext, useState } from 'react';
@@ -83,13 +82,14 @@ export default function Header() {
   const user = session?.user || {};
   const isAuthed = status === 'authenticated';
 
-  const role = user?.role; // 'customer' | 'admin' | 'accounting' | 'cashier' | undefined
+  const role = user?.role;
   const isAdmin = user?.admin === true || role === 'admin';
   const isAccounting = user?.accounting === true || role === 'accounting';
   const isCashier = user?.cashier === true || role === 'cashier';
+  const isRider = role === 'rider';
   const isCustomer = role === 'customer';
 
-  // HOME visibility: show if NOT authenticated OR is customer
+  // Show home only if customer or not logged in
   const showHome = !isAuthed || isCustomer;
 
   const userFirstName = user?.firstName || '';
@@ -104,7 +104,7 @@ export default function Header() {
   const canSeeInventory = isAdmin || isCashier;
   const canSeeAccounting = isAdmin || isAccounting;
 
-  // Build nav items, then sort alphabetically by label.
+  // FULL NAV ITEMS ARRAY WITH RIDER
   const navItems = [
     { label: 'Accounting', href: '/accounting', show: canSeeAccounting },
     { label: 'Home', href: '/', show: showHome },
@@ -117,26 +117,29 @@ export default function Header() {
     },
     { label: 'Orders', href: '/orders', show: isAuthed },
     { label: 'Users', href: '/users', show: isAdmin },
+
+    // ⭐ NEW: Rider page
+    {
+      label: 'Rider',
+      href: '/rider',
+      show: isAdmin || isRider,
+    },
   ]
     .filter((i) => i.show)
     .sort((a, b) => a.label.localeCompare(b.label));
 
-  // Helper to check if link is active
   const isActive = (href) => {
-    if (href === '/') {
-      return pathname === '/';
-    }
+    if (href === '/') return pathname === '/';
     return pathname.startsWith(href);
   };
 
   return (
     <header className="border-b bg-transparent">
       <div className="mx-auto px-4 sm:px-6 lg:px-8 py-3 md:py-4">
-        {/* Top bar (logo + toggles) - mobile only */}
+        {/* MOBILE HEADER */}
         <div className="flex items-center md:hidden justify-between gap-3">
           <img src="/logo.png" alt="Logo" className="w-40 max-w-full h-auto" />
           <div className="flex gap-3 items-center">
-            {/* Cart only for authenticated customers */}
             {isAuthed && isCustomer && <CartLink count={cartCount} />}
             <button
               className="p-2 rounded-md border hover:bg-white/80 cursor-pointer transition"
@@ -148,7 +151,7 @@ export default function Header() {
           </div>
         </div>
 
-        {/* Mobile nav drawer */}
+        {/* MOBILE NAV DRAWER */}
         {mobileNavOpen && (
           <div className="md:hidden mt-2 rounded-xl border bg-white shadow-lg p-4 flex flex-col gap-2 text-center">
             {navItems.map((item) => {
@@ -169,7 +172,6 @@ export default function Header() {
               );
             })}
 
-            {/* Auth */}
             <div className="pt-2 border-t mt-2 flex flex-col gap-2">
               <AuthLinks
                 status={status}
@@ -180,7 +182,7 @@ export default function Header() {
           </div>
         )}
 
-        {/* Desktop header - HIDDEN ON MOBILE */}
+        {/* DESKTOP NAV */}
         <div className="hidden md:flex items-center justify-between gap-4">
           <div className="flex items-center gap-2 lg:gap-4 xl:gap-6 text-gray-600 font-semibold">
             <img
@@ -213,7 +215,6 @@ export default function Header() {
               userFirstName={userFirstName}
               userName={userFirstName || userName}
             />
-            {/* Cart only for authenticated customers */}
             {isAuthed && isCustomer && <CartLink count={cartCount} />}
           </div>
         </div>

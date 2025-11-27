@@ -17,11 +17,29 @@ function isValidPhone(str) {
 export async function POST(req) {
   try {
     const body = await req.json();
-    const { email, password, firstName, lastName, address, phone } = body || {};
+    const {
+      email,
+      password,
+      firstName,
+      lastName,
+      address,
+      phone,
+      accountType,      // 'customer' | 'rider'
+      riderImageData,   // base64 or data URL for rider proof image
+    } = body || {};
 
     if (!email || !password || !firstName || !lastName || !address || !phone) {
       return Response.json(
         { message: 'All fields are required.' },
+        { status: 400 }
+      );
+    }
+
+    const normalizedAccountType = (accountType === 'rider' ? 'rider' : 'customer');
+
+    if (normalizedAccountType === 'rider' && !riderImageData) {
+      return Response.json(
+        { message: 'Proof image is required for rider accounts.' },
         { status: 400 }
       );
     }
@@ -87,6 +105,9 @@ export async function POST(req) {
       phone: ph,
       otp,
       otpExpiry,
+      // NEW fields:
+      accountType: normalizedAccountType, // "customer" or "rider"
+      riderImageData: normalizedAccountType === 'rider' ? riderImageData : undefined,
     });
 
     // Send OTP email

@@ -15,19 +15,55 @@ export default function RegisterPage() {
     lastName: '',
     address: '',
     phone: '',
+    accountType: 'customer',  // NEW: 'customer' | 'rider'
+    riderImageData: '',       // NEW: base64/dataURL
   });
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
 
-  // 👇 NEW: controls show/hide password
+  // show/hide password
   const [showPassword, setShowPassword] = useState(false);
+
+  // local preview of rider image
+  const [riderImagePreview, setRiderImagePreview] = useState(null);
 
   function update(key, value) {
     setForm((s) => ({ ...s, [key]: value }));
   }
 
+  function handleAccountTypeChange(type) {
+    if (type !== 'customer' && type !== 'rider') return;
+    setForm((s) => ({
+      ...s,
+      accountType: type,
+    }));
+  }
+
+  function handleRiderImageChange(e) {
+    const file = e.target.files?.[0];
+    if (!file) {
+      setRiderImagePreview(null);
+      update('riderImageData', '');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result || '';
+      setRiderImagePreview(result);
+      update('riderImageData', result); // store data URL/base64 string
+    };
+    reader.readAsDataURL(file);
+  }
+
   async function onSubmitRegistration(e) {
     e.preventDefault();
+
+    if (form.accountType === 'rider' && !form.riderImageData) {
+      toast.error('Please upload an image to register as a rider.');
+      return;
+    }
+
     setLoading(true);
     try {
       const res = await fetch('/api/register', {
@@ -92,12 +128,57 @@ export default function RegisterPage() {
         <div className="mx-auto w-full max-w-xl rounded-2xl border border-white/30 bg-white/70 p-6 shadow-sm backdrop-blur-xl">
           {step === 1 ? (
             <>
-              <h1 className="text-center text-2xl font-semibold text-zinc-900">Create an account</h1>
+              <h1 className="text-center text-2xl font-semibold text-zinc-900">
+                Create an account
+              </h1>
               <p className="mt-1 text-center text-sm text-zinc-600">
                 Join Pinagpala Cafe ☕ — it only takes a minute.
               </p>
 
-              <form onSubmit={onSubmitRegistration} className="mt-6 grid grid-cols-1 gap-3">
+              <form
+                onSubmit={onSubmitRegistration}
+                className="mt-6 grid grid-cols-1 gap-3"
+              >
+                {/* Account type toggle */}
+                <div>
+                  <p className="mb-1 text-xs font-semibold text-zinc-700">
+                    Register as
+                  </p>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleAccountTypeChange('customer')}
+                      className={[
+                        'cursor-pointer rounded-xl border px-4 py-2 text-sm font-semibold transition',
+                        form.accountType === 'customer'
+                          ? 'border-[#A5724A] bg-[#F3EDE2] text-[#7A4E2A] shadow-sm'
+                          : 'border-zinc-300 bg-white hover:bg-zinc-50 text-zinc-700',
+                      ].join(' ')}
+                    >
+                      Customer
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleAccountTypeChange('rider')}
+                      className={[
+                        'cursor-pointer rounded-xl border px-4 py-2 text-sm font-semibold transition',
+                        form.accountType === 'rider'
+                          ? 'border-emerald-500 bg-emerald-50 text-emerald-700 shadow-sm'
+                          : 'border-zinc-300 bg-white hover:bg-zinc-50 text-zinc-700',
+                      ].join(' ')}
+                    >
+                      Rider
+                    </button>
+                  </div>
+                  {form.accountType === 'rider' && (
+                    <p className="mt-1 text-[11px] text-zinc-500">
+                      We’ll review your rider application before you can take
+                      delivery orders. Please upload a clear photo of your ID or
+                      rider proof.
+                    </p>
+                  )}
+                </div>
+
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <input
                     className={inputCls}
@@ -144,10 +225,38 @@ export default function RegisterPage() {
                   required
                 />
 
-                {/* 👇 Password with show/hide toggle */}
+                {/* Rider image upload (only when accountType === 'rider') */}
+                {form.accountType === 'rider' && (
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-zinc-700">
+                      Rider proof image <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      className={inputCls}
+                      type="file"
+                      accept="image/*"
+                      onChange={handleRiderImageChange}
+                      required={form.accountType === 'rider'}
+                    />
+                    {riderImagePreview && (
+                      <div className="mt-2">
+                        <p className="mb-1 text-[11px] text-zinc-500">
+                          Preview:
+                        </p>
+                        <img
+                          src={riderImagePreview}
+                          alt="Rider proof preview"
+                          className="max-h-40 rounded-lg border border-zinc-200 object-contain"
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Password with show/hide toggle */}
                 <div className="relative">
                   <input
-                    className={inputCls + ' pr-12'} // extra right padding for the button
+                    className={inputCls + ' pr-12'}
                     type={showPassword ? 'text' : 'password'}
                     placeholder="Password (min 5 chars)"
                     value={form.password}
@@ -156,10 +265,8 @@ export default function RegisterPage() {
                     minLength={5}
                   />
                   <span
-                    type="button"
                     onClick={() => setShowPassword((v) => !v)}
-                    disabled={loading}
-                    className="absolute cursor-pointer inset-y-0 right-4 flex items-center text-xs font-medium text-zinc-500 hover:text-zinc-700 disabled:opacity-60"
+                    className="absolute inset-y-0 right-4 flex items-center text-xs font-medium text-zinc-500 hover:text-zinc-700 cursor-pointer"
                   >
                     {showPassword ? 'Hide' : 'Show'}
                   </span>
@@ -179,7 +286,10 @@ export default function RegisterPage() {
 
                 <p className="text-center text-sm text-zinc-600">
                   Already have an account?{' '}
-                  <Link className="font-semibold text-[#7A4E2A] underline" href="/login">
+                  <Link
+                    className="font-semibold text-[#7A4E2A] underline"
+                    href="/login"
+                  >
                     Log in
                   </Link>
                 </p>
@@ -187,19 +297,28 @@ export default function RegisterPage() {
             </>
           ) : (
             <>
-              <h1 className="text-center text-2xl font-semibold text-zinc-900">Verify your email</h1>
+              <h1 className="text-center text-2xl font-semibold text-zinc-900">
+                Verify your email
+              </h1>
               <p className="mt-1 text-center text-sm text-zinc-600">
                 We sent a 6-digit code to <strong>{form.email}</strong>
               </p>
 
-              <form onSubmit={onSubmitOTP} className="mt-6 grid grid-cols-1 gap-4">
+              <form
+                onSubmit={onSubmitOTP}
+                className="mt-6 grid grid-cols-1 gap-4"
+              >
                 <div>
                   <input
                     className={`${inputCls} text-center text-2xl tracking-widest font-semibold`}
                     type="text"
                     placeholder="000000"
                     value={otp}
-                    onChange={(e) => setOtp(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                    onChange={(e) =>
+                      setOtp(
+                        e.target.value.replace(/\D/g, '').slice(0, 6)
+                      )
+                    }
                     required
                     maxLength={6}
                     pattern="\d{6}"
