@@ -1,127 +1,251 @@
+// app/components/profile/ProfileForm.jsx
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useSession } from 'next-auth/react';
 import toast from 'react-hot-toast';
 
+// Barangays of San Mateo, Rizal
+const BARANGAYS = [
+  'Ampid 1',
+  'Ampid 2',
+  'Banaba',
+  'Dulong Bayan 1',
+  'Dulong Bayan 2',
+  'Guinayang',
+  'Guitnang Bayan 1',
+  'Guitnang Bayan 2',
+  'Gulod Malaya',
+  'Malanday',
+  'Maly',
+  'Pintong Bukawe',
+  'Santa Ana',
+  'Santo Niño',
+  'Silangan',
+];
+
 export default function ProfileForm() {
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const { data: session, update: updateSession } = useSession();
+  const [loading, setLoading] = useState(false);
+  const [fetching, setFetching] = useState(true);
 
-  const [firstName, setFirstName] = useState('');
-  const [lastName,  setLastName]  = useState('');
-  const [address,   setAddress]   = useState('');
-  const [phone,     setPhone]     = useState('');
-  const [email,     setEmail]     = useState('');
-  const [role,      setRole]      = useState('');
+  const [form, setForm] = useState({
+    firstName: '',
+    lastName: '',
+    street: '',
+    barangay: BARANGAYS[0],
+    city: 'San Mateo',
+    province: 'Rizal',
+    phone: '',
+  });
 
-  async function loadProfile() {
+  useEffect(() => {
+    async function loadProfile() {
+      try {
+        const res = await fetch('/api/profile');
+        if (!res.ok) throw new Error('Failed to load profile');
+        const data = await res.json();
+        const user = data.user || {};
+
+        // ----- smart fallback from `address` for old users -----
+        let street = user.street || '';
+        let barangay = user.barangay || '';
+        let city = user.city || 'San Mateo';
+        let province = user.province || 'Rizal';
+
+        if (!street && typeof user.address === 'string') {
+          const parts = user.address.split(',').map((p) => p.trim());
+          // very basic best-effort split: "street, barangay, city, province"
+          street = parts[0] || street;
+          barangay = parts[1] || barangay;
+          city = parts[2] || city;
+          province = parts[3] || province;
+        }
+
+        setForm({
+          firstName: user.firstName || '',
+          lastName: user.lastName || '',
+          street: street || '',
+          barangay: barangay || BARANGAYS[0],
+          city,
+          province,
+          phone: user.phone || '',
+        });
+      } catch (err) {
+        console.error(err);
+        toast.error('Failed to load profile.');
+      } finally {
+        setFetching(false);
+      }
+    }
+
+    loadProfile();
+  }, []);
+
+  function update(key, value) {
+    setForm((s) => ({ ...s, [key]: value }));
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault();
     setLoading(true);
-    try {
-      const res = await fetch('/api/profile', { cache: 'no-store' });
-      const ct = res.headers.get('content-type') || '';
-      const data = ct.includes('application/json') ? await res.json() : { message: await res.text() };
-      if (!res.ok) throw new Error(data?.message || 'Failed to load profile');
 
-      const u = data.user || {};
-      setFirstName(u.firstName || '');
-      setLastName(u.lastName || '');
-      setAddress(u.address || '');
-      setPhone(u.phone || '');
-      setEmail(u.email || '');
-      setRole(u.role || (u.admin ? 'admin' : 'customer'));
-    } catch (e) {
-      console.error(e);
-      toast.error(e.message || 'Failed to load profile');
+    try {
+      const res = await fetch('/api/profile', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.message || 'Update failed.');
+        return;
+      }
+
+      // Update session with new data
+      await updateSession({
+        ...session,
+        user: {
+          ...session?.user,
+          ...data.user,
+        },
+      });
+
+      toast.success('Profile updated successfully!');
+    } catch (err) {
+      console.error(err);
+      toast.error('Something went wrong.');
     } finally {
       setLoading(false);
     }
   }
 
-  useEffect(() => { loadProfile(); }, []);
+  const inputCls =
+    'w-full rounded-xl border border-zinc-300/70 bg-white/90 px-4 py-2.5 text-zinc-800 ' +
+    'outline-none transition placeholder:text-zinc-400 ' +
+    'focus:border-[#A5724A] focus:ring-2 focus:ring-[#8B5E34]/30';
 
-  async function onSave(e) {
-    e.preventDefault();
-    setSaving(true);
-    try {
-      const res = await fetch('/api/profile', {
-        method: 'PATCH',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ firstName, lastName, address, phone }),
-      });
-      const ct = res.headers.get('content-type') || '';
-      const data = ct.includes('application/json') ? await res.json() : { message: await res.text() };
-      if (!res.ok) throw new Error(data?.message || 'Failed to update profile');
-
-      toast.success('Profile updated');
-    } catch (e) {
-      console.error(e);
-      toast.error(e.message || 'Failed to update profile');
-    } finally {
-      setSaving(false);
-    }
+  if (fetching) {
+    return (
+      <div className="text-center py-8 text-zinc-500">
+        Loading profile...
+      </div>
+    );
   }
 
-  const inputCls =
-    'mt-1 w-full rounded-xl border border-zinc-300/70 bg-white/90 px-4 py-2 text-zinc-800 outline-none transition ' +
-    'placeholder:text-zinc-400 focus:border-[#A5724A] focus:ring-2 focus:ring-[#8B5E34]/30 disabled:bg-zinc-100';
-
-  const readOnlyCls =
-    'mt-1 w-full rounded-xl border border-zinc-300/70 bg-zinc-50 px-4 py-2 text-zinc-700';
-
   return (
-    // Center the form itself (in case the parent isn’t constraining)
-    <form className="max-w-3xl mx-auto" onSubmit={onSave}>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>
-          <label className="block text-sm font-medium text-zinc-700">First name</label>
-          <input className={inputCls} value={firstName} onChange={(e) => setFirstName(e.target.value)} disabled={loading || saving} required />
+          <label className="mb-1 block text-xs font-semibold text-zinc-700">
+            First Name <span className="text-red-500">*</span>
+          </label>
+          <input
+            className={inputCls}
+            type="text"
+            value={form.firstName}
+            onChange={(e) => update('firstName', e.target.value)}
+            required
+          />
         </div>
         <div>
-          <label className="block text-sm font-medium text-zinc-700">Last name</label>
-          <input className={inputCls} value={lastName} onChange={(e) => setLastName(e.target.value)} disabled={loading || saving} required />
-        </div>
-      </div>
-
-      <div className="mt-4">
-        <label className="block text-sm font-medium text-zinc-700">Address</label>
-        <input className={inputCls} value={address} onChange={(e) => setAddress(e.target.value)} disabled={loading || saving} required />
-      </div>
-
-      <div className="mt-4">
-        <label className="block text-sm font-medium text-zinc-700">Phone</label>
-        <input className={inputCls} value={phone} onChange={(e) => setPhone(e.target.value)} disabled={loading || saving} required />
-      </div>
-
-      <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-zinc-700">Email</label>
-          <input className={readOnlyCls} value={email} disabled />
-        </div>
-        <div>
-          <label className="block text-sm font-medium text-zinc-700">Role</label>
-          <input className={readOnlyCls} value={role} disabled />
+          <label className="mb-1 block text-xs font-semibold text-zinc-700">
+            Last Name <span className="text-red-500">*</span>
+          </label>
+          <input
+            className={inputCls}
+            type="text"
+            value={form.lastName}
+            onChange={(e) => update('lastName', e.target.value)}
+            required
+          />
         </div>
       </div>
 
-      <div className="mt-6 flex flex-col gap-2 sm:flex-row sm:items-center">
-        <button
-          type="button"
-          onClick={loadProfile}
-          disabled={loading || saving}
-          className="cursor-pointer inline-flex items-center justify-center rounded-full border border-[#B08B62]/50 bg-white/80 px-6 py-2.5 font-semibold text-zinc-700 hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8B5E34]/50 disabled:opacity-60"
+      <div>
+        <label className="mb-1 block text-xs font-semibold text-zinc-700">
+          Street Address <span className="text-red-500">*</span>
+        </label>
+        <input
+          className={inputCls}
+          type="text"
+          placeholder="e.g., 123 Main Street, Block 5 Lot 10"
+          value={form.street}
+          onChange={(e) => update('street', e.target.value)}
+          required
+        />
+      </div>
+
+      <div>
+        <label className="mb-1 block text-xs font-semibold text-zinc-700">
+          Barangay <span className="text-red-500">*</span>
+        </label>
+        <select
+          className={inputCls}
+          value={form.barangay}
+          onChange={(e) => update('barangay', e.target.value)}
+          required
         >
-          Reset
-        </button>
-
-        <button
-          type="submit"
-          disabled={loading || saving}
-          style={{ color: 'white' }}
-          className="cursor-pointer inline-flex items-center justify-center rounded-full border border-white/30 bg-gradient-to-r from-[#A5724A] to-[#7A4E2A] px-6 py-2.5 text-white shadow-md shadow-[#A5724A]/20 transition hover:shadow-[#A5724A]/40 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8B5E34]/60 disabled:opacity-60"
-        >
-          {saving ? 'Saving…' : 'Save changes'}
-        </button>
+          {BARANGAYS.map((brgy) => (
+            <option key={brgy} value={brgy}>
+              {brgy}
+            </option>
+          ))}
+        </select>
       </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div>
+          <label className="mb-1 block text-xs font-semibold text-zinc-700">
+            City
+          </label>
+          <input
+            className={inputCls + ' bg-zinc-100 cursor-not-allowed'}
+            type="text"
+            value={form.city}
+            disabled
+            readOnly
+          />
+        </div>
+        <div>
+          <label className="mb-1 block text-xs font-semibold text-zinc-700">
+            Province
+          </label>
+          <input
+            className={inputCls + ' bg-zinc-100 cursor-not-allowed'}
+            type="text"
+            value={form.province}
+            disabled
+            readOnly
+          />
+        </div>
+      </div>
+
+      <div>
+        <label className="mb-1 block text-xs font-semibold text-zinc-700">
+          Phone <span className="text-red-500">*</span>
+        </label>
+        <input
+          className={inputCls}
+          type="tel"
+          value={form.phone}
+          onChange={(e) => update('phone', e.target.value)}
+          required
+        />
+      </div>
+
+      <button
+        type="submit"
+        disabled={loading}
+        style={{ color: 'white' }}
+        className="cursor-pointer inline-flex items-center justify-center rounded-full border border-white/30 
+                   bg-gradient-to-r from-[#A5724A] to-[#7A4E2A] px-5 py-2.5 text-white 
+                   shadow-md shadow-[#A5724A]/20 transition hover:shadow-[#A5724A]/40 
+                   focus:outline-none focus-visible:ring-2 focus-visible:ring-[#8B5E34]/60 disabled:opacity-60"
+      >
+        {loading ? 'Saving...' : 'Save Changes'}
+      </button>
     </form>
   );
 }

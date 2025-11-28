@@ -29,22 +29,18 @@ function normalizePhPhone(raw) {
   if (!raw) return '';
   let digits = String(raw).replace(/\D/g, '');
 
-  // If it’s 11 digits and starts with 0, drop the 0 (09123... -> 9123...)
   if (digits.length === 11 && digits.startsWith('0')) {
     digits = digits.slice(1);
   }
 
-  // If longer than 10, keep the last 10 digits
   if (digits.length > 10) {
     digits = digits.slice(-10);
   }
 
-  // At this point we *hope* it's 10 digits and starts with 9
   if (digits.length === 10 && digits.startsWith('9')) {
     return digits;
   }
 
-  // Fallback: still return whatever we have, PayMongo will validate further if needed
   return digits;
 }
 
@@ -55,17 +51,9 @@ export async function POST(req) {
     const body = await req.json();
     const { cartProducts = [], address = {} } = body;
 
-    console.log('=== CHECKOUT REQUEST ===');
-    console.log('body.orderMethod:', body.orderMethod);
-    console.log('address.orderMethod:', address.orderMethod);
-    console.log('address.fulfillment:', address.fulfillment);
-
     const orderMethod = normalizeOrderMethod(
       body.orderMethod || address.orderMethod || address.fulfillment || 'pickup'
     );
-
-    console.log('Final normalized orderMethod:', orderMethod);
-    console.log('=======================');
 
     if (!Array.isArray(cartProducts) || cartProducts.length === 0) {
       return Response.json({ error: 'Cart is empty' }, { status: 400 });
@@ -81,7 +69,6 @@ export async function POST(req) {
 
       userEmail = session?.user?.email || '';
 
-      // Try multiple shapes: name OR firstName + lastName
       const fullNameFromParts = [
         session?.user?.firstName,
         session?.user?.lastName,
@@ -91,15 +78,13 @@ export async function POST(req) {
         .trim();
 
       userName = session?.user?.name || fullNameFromParts || '';
-
       userPhone = session?.user?.phone || '';
     } catch {
       // ignore if no session
     }
 
     // Email priority: session -> address.email -> body.email
-    const billingEmail =
-      userEmail || address?.email || body?.email || '';
+    const billingEmail = userEmail || address?.email || body?.email || '';
     if (!billingEmail) {
       return Response.json(
         { error: 'Email is required for checkout' },
@@ -111,9 +96,18 @@ export async function POST(req) {
     const billingName = userName || 'Customer';
 
     // Phone priority: checkout phone (address.phone) -> profile phone
-    const billingPhone = normalizePhPhone(
-      address?.phone || userPhone || ''
-    );
+    const billingPhone = normalizePhPhone(address?.phone || userPhone || '');
+
+    // ✅ FIXED: Properly combine street + barangay + city + province (NO country in address string)
+    const street = address?.streetAddress || '';
+    const barangay = address?.barangay || '';
+    const city = address?.city || 'San Mateo';
+    const province = address?.province || 'Rizal';
+    
+    // Build full address: "street, barangay, city, province" (4 parts only)
+    const fullAddress = [street, barangay, city, province]
+      .filter(Boolean)
+      .join(', ');
 
     // -------- Build line items & total --------
     const lineItems = [];
@@ -196,16 +190,14 @@ export async function POST(req) {
       totalPrice += DELIVERY_FEE_PHP;
     }
 
-    console.log('Creating CheckoutIntent with orderMethod:', orderMethod);
-
     // -------- Create CheckoutIntent --------
     const intent = await CheckoutIntent.create({
       userEmail: billingEmail,
       address: {
         name: billingName,
         phone: billingPhone,
-        streetAddress: address?.streetAddress || '',
-        city: address?.city || '',
+        streetAddress: fullAddress,  // ✅ "street, barangay, city, province"
+        city: city,
         country: address?.country || 'PH',
         email: billingEmail,
         fulfillment: address?.fulfillment || undefined,
@@ -215,15 +207,6 @@ export async function POST(req) {
       lineItems,
       totalPrice,
       status: 'open',
-    });
-
-    console.log('CheckoutIntent created:', {
-      id: intent._id,
-      orderMethod: intent.orderMethod,
-      totalPrice: intent.totalPrice,
-      billingName,
-      billingEmail,
-      billingPhone,
     });
 
     const intentId = String(intent._id);
@@ -254,8 +237,8 @@ export async function POST(req) {
             email: billingEmail,
             phone: billingPhone,
             address: {
-              line1: address?.streetAddress || '',
-              city: address?.city || '',
+              line1: fullAddress,  // ✅ "street, barangay, city, province"
+              city: city,
               country: 'PH',
             },
           },

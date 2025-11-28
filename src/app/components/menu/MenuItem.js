@@ -4,6 +4,7 @@ import Image from 'next/image';
 import { useContext, useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useSession } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 
 import { CartContext } from '../AppContext';
 import MenuItemTile from './MenuItemTile';
@@ -57,12 +58,16 @@ export default function MenuItem(menuItem) {
   } = menuItem;
 
   const { data: session, status } = useSession();
-  const role = session?.user?.role; // 'customer' | 'admin' | 'cashier' | 'accounting'
+  const router = useRouter();
+  
+  const role = session?.user?.role;
   const isCustomer = status === 'authenticated' && role === 'customer';
+  const isAuthenticated = status === 'authenticated';
 
   const { addToCart } = useContext(CartContext);
 
   const [showPopup, setShowPopup] = useState(false);
+  const [showLoginPrompt, setShowLoginPrompt] = useState(false);
   const [selectedSize, setSelectedSize] = useState(sizes?.[0] || null);
   const [selectedExtras, setSelectedExtras] = useState([]);
 
@@ -79,7 +84,16 @@ export default function MenuItem(menuItem) {
   }, [basePrice, selectedSize, selectedExtras]);
 
   async function handleAddToCartButtonClick() {
-    if (!isCustomer) return;
+    // If not authenticated, show login prompt
+    if (!isAuthenticated) {
+      setShowLoginPrompt(true);
+      return;
+    }
+
+    // If authenticated but not a customer (admin, cashier, accounting)
+    if (!isCustomer) {
+      return;
+    }
 
     const hasOptions =
       (sizes?.length ?? 0) > 0 || (extraIngredientPrices?.length ?? 0) > 0;
@@ -108,11 +122,81 @@ export default function MenuItem(menuItem) {
 
   return (
     <>
-      {/* The product card */}
+      {/* The product card - always show add to cart button */}
       <MenuItemTile
-        onAddToCart={isCustomer ? handleAddToCartButtonClick : undefined}
+        onAddToCart={handleAddToCartButtonClick}
         {...menuItem}
       />
+
+      {/* Login Prompt Modal */}
+      <PortalModal open={showLoginPrompt} onClose={() => setShowLoginPrompt(false)}>
+        <div className="p-6 text-center">
+          <div className="mb-6">
+            <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-amber-100">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                strokeWidth={2}
+                stroke="currentColor"
+                className="h-8 w-8 text-amber-600"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"
+                />
+              </svg>
+            </div>
+            <h2 className="mb-2 text-xl font-bold text-zinc-900">
+              Login First to Order
+            </h2>
+            <p className="text-sm text-zinc-600">
+              Please sign in to your account to add items to your cart and place orders.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <span
+              role="link"
+              tabIndex={0}
+              onClick={() => {
+                setShowLoginPrompt(false);
+                router.push('/register');
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setShowLoginPrompt(false);
+                  router.push('/register');
+                }
+              }}
+              className="rounded-full cursor-pointer border border-zinc-300 bg-white px-5 py-2.5 font-semibold text-zinc-700 hover:bg-zinc-50 transition"
+            >
+              Register
+            </span>
+
+            <span
+              role="link"
+              tabIndex={0}
+              onClick={() => {
+                setShowLoginPrompt(false);
+                router.push('/login');
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setShowLoginPrompt(false);
+                  router.push('/login');
+                }
+              }}
+              className="rounded-full cursor-pointer border border-white/30 bg-gradient-to-r from-[#A5724A] to-[#7A4E2A] px-5 py-2.5 font-semibold text-white shadow-md shadow-[#A5724A]/20 hover:shadow-[#A5724A]/40 transition"
+            >
+              Login
+            </span>
+          </div>
+        </div>
+      </PortalModal>
 
       {/* Options Modal */}
       <PortalModal open={showPopup} onClose={() => setShowPopup(false)}>
@@ -234,7 +318,7 @@ export default function MenuItem(menuItem) {
               {isCustomer ? (
                 <FlyingButton targetTop="5%" targetLeft="95%" src={image}>
                   <button
-                  style={{color:'white'}}
+                    style={{ color: 'white' }}
                     type="button"
                     onClick={handleAddToCartButtonClick}
                     className="cursor-pointer inline-flex w-full items-center justify-center rounded-full border border-white/30 bg-gradient-to-r from-[#A5724A] to-[#7A4E2A] px-5 py-2 font-semibold text-white shadow-md shadow-[#A5724A]/20 hover:shadow-[#A5724A]/40"
@@ -244,7 +328,7 @@ export default function MenuItem(menuItem) {
                 </FlyingButton>
               ) : (
                 <button
-                style={{color:'white'}}
+                  style={{ color: 'white' }}
                   type="button"
                   className="inline-flex w-full cursor-not-allowed items-center justify-center rounded-full border border-zinc-200 bg-zinc-100 px-5 py-2 font-semibold text-zinc-500"
                   disabled

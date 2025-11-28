@@ -54,9 +54,11 @@ export default function CartPage() {
   const [address, setAddress] = useState({
     phone: '',
     streetAddress: '',
-    city: '',
+    barangay: '',
+    city: 'San Mateo',
+    province: 'Rizal',
     country: 'Philippines',
-    orderMethod: 'pickup', // canonical field
+    orderMethod: 'pickup',
   });
 
   // Handle success/cancel + clear-cart
@@ -73,7 +75,7 @@ export default function CartPage() {
     }
   }, [clearCart]);
 
-  // Load & save address locally (migrates old "fulfillment" to "orderMethod")
+  // Load & save address locally with migration for old format
   useEffect(() => {
     if (typeof window === 'undefined') return;
     const saved = window.localStorage.getItem('checkoutAddress');
@@ -85,14 +87,31 @@ export default function CartPage() {
           orderMethod =
             parsed.fulfillment === 'dinein'
               ? 'dine_in'
-              : parsed.fulfillment; // migrate
+              : parsed.fulfillment;
         }
+
+        // ✅ MIGRATION: If streetAddress contains commas, it's the old format
+        // Try to parse it back into components
+        let migratedStreet = parsed.streetAddress || '';
+        let migratedBarangay = parsed.barangay || '';
+
+        if (migratedStreet && migratedStreet.includes(',')) {
+          // Old format: "street, barangay, city, province"
+          const parts = migratedStreet.split(',').map(p => p.trim());
+          migratedStreet = parts[0] || '';
+          migratedBarangay = parts[1] || migratedBarangay;
+        }
+
         setAddress((prev) => ({
           ...prev,
           ...parsed,
+          streetAddress: migratedStreet,
+          barangay: migratedBarangay,
           ...(orderMethod ? { orderMethod } : {}),
         }));
-      } catch {}
+      } catch {
+        // ignore parse errors
+      }
     }
   }, []);
 
@@ -101,20 +120,41 @@ export default function CartPage() {
     window.localStorage.setItem('checkoutAddress', JSON.stringify(address));
   }, [address]);
 
-  // Prefill phone from profile if address.phone is empty
+  // Prefill from profile (phone + address) if not already set
   useEffect(() => {
     if (!session) return;
+    const u = session.user || {};
 
-    const rawProfilePhone = session.user?.phone || '';
-    if (!rawProfilePhone) return;
-
-    const normalized = normalizePhPhone(rawProfilePhone);
-    if (!normalized) return;
+    const rawProfilePhone = u.phone || '';
+    const normalizedPhone = normalizePhPhone(rawProfilePhone);
 
     setAddress((prev) => {
-      // Don't override if user/localStorage already set a phone
-      if (prev.phone && prev.phone.trim() !== '') return prev;
-      return { ...prev, phone: normalized };
+      const next = { ...prev };
+
+      // Phone: only prefill if empty
+      if (!prev.phone && normalizedPhone) {
+        next.phone = normalizedPhone;
+      }
+
+      // Street: only prefill if empty
+      if (!prev.streetAddress && u.street) {
+        next.streetAddress = u.street;
+      }
+
+      // Barangay: prefill separately
+      if (!prev.barangay && u.barangay) {
+        next.barangay = u.barangay;
+      }
+
+      // City / Province defaults
+      if (!prev.city) {
+        next.city = u.city || 'San Mateo';
+      }
+      if (!prev.province) {
+        next.province = u.province || 'Rizal';
+      }
+
+      return next;
     });
   }, [session]);
 
@@ -134,7 +174,7 @@ export default function CartPage() {
     return Array.from(map.values());
   }, [cartProducts]);
 
-  // Totals (align fee with backend default 50 unless you set env)
+  // Totals
   const DELIVERY_FEE_PHP = 50;
   const subtotal =
     groups.reduce(
@@ -175,16 +215,12 @@ export default function CartPage() {
     if (address.orderMethod === 'delivery') {
       if (!address.streetAddress?.trim())
         return toast.error('Street address is required');
+      if (!address.barangay?.trim())
+        return toast.error('Barangay is required');
       if (!address.city?.trim()) return toast.error('City is required');
       if (!address.country?.trim())
         return toast.error('Country is required');
     }
-
-    // Debug logging - REMOVE AFTER TESTING
-    console.log('=== CART PAGE - SENDING TO CHECKOUT ===');
-    console.log('address.orderMethod:', address.orderMethod);
-    console.log('Full address object:', address);
-    console.log('=======================================');
 
     const promise = new Promise((resolve, reject) => {
       fetch('/api/checkout', {
@@ -282,7 +318,7 @@ export default function CartPage() {
             />
             <button
               type="submit"
-              className="mt-2 w-full rounded-full px-5 py-2.5 font-semibold text-white shadow-md shadow-[#A5724A]/20 hover:shadow-[#A5724A]/40 cursor-pointer"
+              className="mt-2 w-full rounded-full px-5 py-2.5 font-semibold text-white shadow-md shadow-[#A5724A]/20 hover:shadow-[#A5724A]/40 cursor-pointer bg-gradient-to-r from-[#A5724A] to-[#7A4E2A]"
             >
               Pay {peso(grandTotal)}
             </button>

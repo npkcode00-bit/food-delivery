@@ -22,13 +22,16 @@ export async function POST(req) {
       password,
       firstName,
       lastName,
-      address,
+      street,          // NEW
+      barangay,        // NEW
+      city,            // NEW (fixed to "San Mateo")
+      province,        // NEW (fixed to "Rizal")
       phone,
-      accountType,      // 'customer' | 'rider'
-      riderImageData,   // base64 or data URL for rider proof image
+      accountType,
+      riderImageData,
     } = body || {};
 
-    if (!email || !password || !firstName || !lastName || !address || !phone) {
+    if (!email || !password || !firstName || !lastName || !street || !barangay || !phone) {
       return Response.json(
         { message: 'All fields are required.' },
         { status: 400 }
@@ -53,7 +56,8 @@ export async function POST(req) {
 
     const fn = String(firstName).trim();
     const ln = String(lastName).trim();
-    const addr = String(address).trim();
+    const st = String(street).trim();
+    const brgy = String(barangay).trim();
     const ph = String(phone).trim();
 
     if (fn.length < 2 || ln.length < 2) {
@@ -62,9 +66,9 @@ export async function POST(req) {
         { status: 400 }
       );
     }
-    if (addr.length < 5) {
+    if (st.length < 3) {
       return Response.json(
-        { message: 'Please provide a valid address.' },
+        { message: 'Please provide a valid street address.' },
         { status: 400 }
       );
     }
@@ -95,18 +99,24 @@ export async function POST(req) {
     // Delete any existing pending registration for this email
     await PendingUser.deleteOne({ email: normalizedEmail });
 
+    // Construct full address
+    const fullAddress = `${st}, ${brgy}, ${city || 'San Mateo'}, ${province || 'Rizal'}`;
+
     // Store pending registration
     await PendingUser.create({
       email: normalizedEmail,
       password,
       firstName: fn,
       lastName: ln,
-      address: addr,
+      address: fullAddress,  // Store as complete address
+      street: st,            // Store separately for future editing
+      barangay: brgy,
+      city: city || 'San Mateo',
+      province: province || 'Rizal',
       phone: ph,
       otp,
       otpExpiry,
-      // NEW fields:
-      accountType: normalizedAccountType, // "customer" or "rider"
+      accountType: normalizedAccountType,
       riderImageData: normalizedAccountType === 'rider' ? riderImageData : undefined,
     });
 

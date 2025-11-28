@@ -35,6 +35,29 @@ const UserSchema = new Schema(
       trim: true,
       maxlength: 300,
     },
+    // NEW: separate address components
+    street: {
+      type: String,
+      trim: true,
+      maxlength: 200,
+    },
+    barangay: {
+      type: String,
+      trim: true,
+      maxlength: 100,
+    },
+    city: {
+      type: String,
+      default: 'San Mateo',
+      trim: true,
+      maxlength: 100,
+    },
+    province: {
+      type: String,
+      default: 'Rizal',
+      trim: true,
+      maxlength: 100,
+    },
     phone: {
       type: String,
       required: true,
@@ -44,7 +67,6 @@ const UserSchema = new Schema(
     // Role management
     role: {
       type: String,
-      // 👇 rider added here
       enum: ['customer', 'admin', 'accounting', 'cashier', 'rider', 'superadmin'],
       default: 'customer',
       index: true,
@@ -86,13 +108,29 @@ const UserSchema = new Schema(
       index: true,
     },
 
-    // ✅ Password-reset OTP
+    // Password-reset OTP
     resetOtp: {
       type: String,
       index: true,
     },
     resetOtpExpires: {
       type: Date,
+    },
+
+    // NEW: Rider-specific fields
+    riderImageData: {
+      type: String, // base64 image data for rider proof
+    },
+    riderApproved: {
+      type: Boolean,
+      default: false,
+      index: true,
+    },
+    riderApprovedAt: {
+      type: Date,
+    },
+    riderApprovedBy: {
+      type: String, // admin email who approved
     },
   },
   { timestamps: true }

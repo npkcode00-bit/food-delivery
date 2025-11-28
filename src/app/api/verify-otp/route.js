@@ -1,3 +1,4 @@
+// app/api/verify-otp/route.js
 import mongoose from 'mongoose';
 import { User } from '../../models/User';
 import { PendingUser } from '../../models/PendingUser';
@@ -51,15 +52,40 @@ export async function POST(req) {
       );
     }
 
-    // Create actual user
+    // ---- NEW: build address parts ----
+    const street = pending.street || '';
+    const barangay = pending.barangay || '';
+    const city = pending.city || 'San Mateo';
+    const province = pending.province || 'Rizal';
+
+    const fullAddress =
+      pending.address || `${street}, ${barangay}, ${city}, ${province}`;
+
+    // use accountType from PendingUser to set role
+    const role =
+      pending.accountType === 'rider' ? 'rider' : 'customer';
+
+    // Create actual user (UserSchema.pre('save') will hash password & set flags)
     const createdUser = await User.create({
       email: pending.email,
       password: pending.password,
       firstName: pending.firstName,
       lastName: pending.lastName,
-      address: pending.address,
+
+      // full + split address fields
+      address: fullAddress,
+      street,
+      barangay,
+      city,
+      province,
       phone: pending.phone,
+
+      role,
       isEmailVerified: true,
+
+      // keep rider proof only for riders
+      riderImageData:
+        role === 'rider' ? pending.riderImageData : undefined,
     });
 
     // Delete pending registration

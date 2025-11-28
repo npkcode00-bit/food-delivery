@@ -46,7 +46,7 @@ async function fetchCheckoutSession(id) {
 
 async function fetchPayment(id) {
   const headers = basicAuthHeader();
-  const url = `https://api.payments.com/v1/payments/${id}`;
+  const url = `https://api.paymongo.com/v1/payments/${id}`;
   const resp = await fetch(url, { headers });
   const data = await resp.json();
   if (!resp.ok) return null;
@@ -130,32 +130,28 @@ export async function GET(req) {
         return Response.json({ error: 'Unauthorized' }, { status: 403 });
       }
 
-      console.log('=== FINALIZING ORDER FROM INTENT ===');
-      console.log('Intent ID:', intentId);
-      console.log('Intent orderMethod:', intent.orderMethod);
-      console.log('Intent address.fulfillment:', intent.address?.fulfillment);
-
       // Verify paid
       const paid = await isCheckoutSessionPaid(intent.checkoutSessionId);
       if (!paid) return Response.json({ error: 'Order not found' }, { status: 404 });
 
-      // Normalize method - PRIORITY ORDER
+      // Normalize method
       const method = normalizeOrderMethod(
         intent.orderMethod || intent?.address?.fulfillment || 'pickup'
       );
 
-      console.log('Final normalized orderMethod:', method);
-      console.log('====================================');
+      // ✅ FIXED: Use streetAddress directly (already properly formatted from checkout)
+      // Don't append country to the address string
+      const deliveryAddress = intent.address?.streetAddress || '';
 
-      // Create order (flatten address) with EXPLICIT orderMethod
+      // Create order
       order = await Order.create({
         userEmail: intent.userEmail,
 
         name: intent.address?.name || '',
         phone: intent.address?.phone || '',
-        streetAddress: intent.address?.streetAddress || '',
+        streetAddress: deliveryAddress,  // ✅ Already formatted: "street, barangay, city, province"
         city: intent.address?.city || '',
-        country: intent.address?.country || 'PH',
+        country: intent.address?.country || 'PH',  // ✅ Store country separately, don't append to address
 
         orderMethod: method,
 
@@ -170,13 +166,7 @@ export async function GET(req) {
         },
       });
 
-      console.log('Order created:', {
-        id: order._id,
-        orderMethod: order.orderMethod,
-        userEmail: order.userEmail,
-      });
-
-      // Optional: mark intent consumed/paid
+      // Mark intent consumed
       await CheckoutIntent.findByIdAndUpdate(intentId, {
         status: 'consumed',
         orderId: order._id,

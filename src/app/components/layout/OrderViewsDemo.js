@@ -45,6 +45,12 @@ const fmtTime = (iso) =>
     timeStyle: 'short',
   }).format(new Date(iso));
 
+const fmtDateFull = (iso) =>
+  new Intl.DateTimeFormat('en-PH', {
+    dateStyle: 'full',
+    timeStyle: 'long',
+  }).format(new Date(iso));
+
 const currency = (n) =>
   new Intl.NumberFormat('en-PH', {
     style: 'currency',
@@ -65,6 +71,234 @@ function getNextStatus(currentStatus, orderMethod) {
   const currentIndex = flow.indexOf(currentStatus);
   if (currentIndex === -1 || currentIndex >= flow.length - 1) return null;
   return flow[currentIndex + 1];
+}
+
+/* -------------------- Print Receipt Helper -------------------- */
+function printReceipt(order, orderItems, total, deliveryAddress) {
+  const displayOrderId = order._id?.slice(-6).toUpperCase() || order.id || 'N/A';
+  const displayOrderMethod = getOrderMethodLabel(order.orderMethod || 'pickup');
+  
+  const printWindow = window.open('', '_blank');
+  if (!printWindow) {
+    toast.error('Please allow popups to print receipt');
+    return;
+  }
+
+  const receiptHTML = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="UTF-8">
+      <title>Receipt - Order #${displayOrderId}</title>
+      <style>
+        @media print {
+          @page { margin: 0.5cm; }
+          body { margin: 0; }
+        }
+        
+        * {
+          margin: 0;
+          padding: 0;
+          box-sizing: border-box;
+        }
+        
+        body {
+          font-family: 'Courier New', monospace;
+          padding: 20px;
+          max-width: 80mm;
+          margin: 0 auto;
+          font-size: 12px;
+          line-height: 1.4;
+        }
+        
+        .header {
+          text-align: center;
+          border-bottom: 2px dashed #000;
+          padding-bottom: 10px;
+          margin-bottom: 10px;
+        }
+        
+        .header h1 {
+          font-size: 18px;
+          font-weight: bold;
+          margin-bottom: 5px;
+        }
+        
+        .header p {
+          font-size: 11px;
+          margin: 2px 0;
+        }
+        
+        .section {
+          margin: 10px 0;
+          border-bottom: 1px dashed #000;
+          padding-bottom: 10px;
+        }
+        
+        .section:last-child {
+          border-bottom: 2px dashed #000;
+        }
+        
+        .label {
+          font-weight: bold;
+          display: inline-block;
+          width: 100px;
+        }
+        
+        .items {
+          margin: 10px 0;
+        }
+        
+        .item {
+          margin: 8px 0;
+          padding: 5px 0;
+          border-bottom: 1px dotted #ccc;
+        }
+        
+        .item-name {
+          font-weight: bold;
+          margin-bottom: 3px;
+        }
+        
+        .item-details {
+          font-size: 10px;
+          color: #555;
+          margin-left: 10px;
+        }
+        
+        .item-price {
+          display: flex;
+          justify-content: space-between;
+          margin-top: 3px;
+        }
+        
+        .total-section {
+          margin: 15px 0;
+          font-size: 14px;
+        }
+        
+        .total-line {
+          display: flex;
+          justify-content: space-between;
+          margin: 5px 0;
+        }
+        
+        .total-line.grand {
+          font-size: 16px;
+          font-weight: bold;
+          padding-top: 5px;
+          border-top: 2px solid #000;
+        }
+        
+        .footer {
+          text-align: center;
+          margin-top: 20px;
+          padding-top: 10px;
+          border-top: 2px dashed #000;
+          font-size: 11px;
+        }
+        
+        .print-button {
+          display: block;
+          margin: 20px auto;
+          padding: 10px 30px;
+          background: #111;
+          color: #fff;
+          border: none;
+          border-radius: 5px;
+          font-size: 14px;
+          cursor: pointer;
+        }
+        
+        .print-button:hover {
+          background: #333;
+        }
+        
+        @media print {
+          .print-button {
+            display: none;
+          }
+        }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <h1>PINAGPALA CAFE</h1>
+        <p>San Mateo, Rizal</p>
+        <p>Philippines</p>
+      </div>
+      
+      <div class="section">
+        <p><span class="label">Order ID:</span> #${displayOrderId}</p>
+        <p><span class="label">Order Method:</span> ${displayOrderMethod}</p>
+        <p><span class="label">Date:</span> ${fmtDateFull(order.createdAt)}</p>
+        <p><span class="label">Status:</span> ${STATUS_META[order.status]?.label || order.status}</p>
+      </div>
+      
+      ${order.name ? `
+      <div class="section">
+        <p><span class="label">Customer:</span> ${order.name}</p>
+        ${order.phone ? `<p><span class="label">Phone:</span> ${order.phone}</p>` : ''}
+        ${order.userEmail ? `<p><span class="label">Email:</span> ${order.userEmail}</p>` : ''}
+      </div>
+      ` : ''}
+      
+      ${deliveryAddress ? `
+      <div class="section">
+        <p><span class="label">Address:</span></p>
+        <p style="margin-top: 5px; margin-left: 10px;">${deliveryAddress}</p>
+      </div>
+      ` : ''}
+      
+      <div class="section items">
+        <p style="font-weight: bold; margin-bottom: 10px;">ITEMS:</p>
+        ${orderItems.map(item => `
+          <div class="item">
+            <div class="item-name">${item.name}</div>
+            ${item.size || item.extras ? `
+              <div class="item-details">
+                ${item.size ? `Size: ${item.size}` : ''}
+                ${item.extras ? `<br>Extras: ${item.extras}` : ''}
+              </div>
+            ` : ''}
+            <div class="item-price">
+              <span>Qty: ${item.qty} × ${currency(item.price)}</span>
+              <span><strong>${currency(item.qty * item.price)}</strong></span>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+      
+      <div class="total-section">
+        <div class="total-line grand">
+          <span>TOTAL:</span>
+          <span>${currency(total)}</span>
+        </div>
+        <div class="total-line" style="margin-top: 8px; font-size: 12px;">
+          <span>Payment Status:</span>
+          <span>${order.paid ? '✓ PAID' : 'PENDING'}</span>
+        </div>
+      </div>
+      
+      ${order.notes ? `
+      <div class="section">
+        <p><span class="label">Notes:</span></p>
+        <p style="margin-top: 5px; margin-left: 10px;">${order.notes}</p>
+      </div>
+      ` : ''}
+      
+      <div class="footer">
+        <p>Thank you for your order!</p>
+        <p style="margin-top: 5px;">Please come again</p>
+      </div>
+      
+      <button class="print-button" onclick="window.print()">Print Receipt</button>
+    </body>
+    </html>
+  `;
+
+  printWindow.document.write(receiptHTML);
+  printWindow.document.close();
 }
 
 /* -------------------- API -------------------- */
@@ -324,7 +558,7 @@ function makeLineKey(item, index) {
   return `${id}:${size}:${extras}:${index}`;
 }
 
-function OrderDetails({ order }) {
+function OrderDetails({ order, userRole }) {
   const total = useMemo(() => {
     if (typeof order.totalPrice === 'number') return order.totalPrice;
     if (order.cartProducts && Array.isArray(order.cartProducts)) {
@@ -346,8 +580,12 @@ function OrderDetails({ order }) {
   }, [order]);
 
   const deliveryAddress = useMemo(() => {
+    // ✅ FIXED: Just use streetAddress directly (already formatted as "street, barangay, city, province")
     if (order.deliveryAddress) return order.deliveryAddress;
-    const parts = [order.streetAddress, order.city, order.country].filter(Boolean);
+    if (order.streetAddress) return order.streetAddress;
+    
+    // Fallback for very old orders without streetAddress
+    const parts = [order.city, order.country].filter(Boolean);
     return parts.length > 0 ? parts.join(', ') : null;
   }, [order]);
 
@@ -362,21 +600,39 @@ function OrderDetails({ order }) {
           });
         }
         let itemName = item.name || 'Unknown Item';
-        if (item.size?.name) itemName += ` (${item.size.name})`;
-        if (item.extras?.length)
-          itemName += ` + ${item.extras.map((e) => e.name).join(', ')}`;
+        const sizeText = item.size?.name || null;
+        const extrasText = item.extras?.length ? item.extras.map((e) => e.name).join(', ') : null;
 
         const lineId = makeLineKey(item, index);
-        return { id: lineId, name: itemName, qty: 1, price: itemPrice };
+        return { 
+          id: lineId, 
+          name: itemName, 
+          size: sizeText,
+          extras: extrasText,
+          qty: 1, 
+          price: itemPrice 
+        };
       });
     }
     return (order.items || []).map((it, idx) => ({
       ...it,
       id: `${String(it.id ?? it._id ?? 'noid')}-${idx}`,
+      size: null,
+      extras: null,
     }));
   }, [order]);
 
   const displayOrderMethod = order.orderMethod || 'pickup';
+
+  // Check if order is completed
+  const isCompleted = ['delivered', 'picked_up', 'completed'].includes(order.status);
+  
+  // ✅ Check if user is staff (admin or cashier)
+  const isStaff = userRole === 'admin';
+
+  const handlePrintReceipt = () => {
+    printReceipt(order, orderItems, total, deliveryAddress);
+  };
 
   return (
     <div style={{ display: 'grid', gap: 12 }}>
@@ -404,6 +660,26 @@ function OrderDetails({ order }) {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Print Receipt Button - Only show for completed orders AND staff users */}
+      {isCompleted && isStaff && (
+        <Button
+          variant="outline"
+          onClick={handlePrintReceipt}
+          style={{
+            background: '#e0f2fe',
+            color: '#075985',
+            borderColor: '#7dd3fc',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: 8,
+          }}
+        >
+          <span>🖨️</span>
+          Print Receipt
+        </Button>
       )}
 
       <div
@@ -452,6 +728,13 @@ function OrderDetails({ order }) {
           <div>{fmtTime(order.createdAt)}</div>
         </div>
 
+        {order.name && (
+          <div style={{ gridColumn: '1 / -1' }}>
+            <div style={{ fontSize: 12, color: '#64748b' }}>Customer Name</div>
+            <div>{order.name}</div>
+          </div>
+        )}
+
         {order.userEmail && (
           <div style={{ gridColumn: '1 / -1' }}>
             <div style={{ fontSize: 12, color: '#64748b' }}>Email</div>
@@ -498,12 +781,19 @@ function OrderDetails({ order }) {
                 display: 'flex',
                 justifyContent: 'space-between',
                 padding: 12,
-                borderBottom: '1px solid #e5e7eb',
+                borderBottom: idx < orderItems.length - 1 ? '1px solid #e5e7eb' : 'none',
               }}
             >
               <div>
                 <div style={{ fontWeight: 600 }}>{it.name}</div>
-                <div style={{ fontSize: 12, color: '#64748b' }}>
+                {(it.size || it.extras) && (
+                  <div style={{ fontSize: 11, color: '#64748b', marginTop: 2 }}>
+                    {it.size && `Size: ${it.size}`}
+                    {it.size && it.extras && ' | '}
+                    {it.extras && `Extras: ${it.extras}`}
+                  </div>
+                )}
+                <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
                   Qty: {it.qty} × {currency(it.price)}
                 </div>
               </div>
@@ -517,6 +807,7 @@ function OrderDetails({ order }) {
               display: 'flex',
               justifyContent: 'space-between',
               padding: 12,
+              background: '#f8fafc',
             }}
           >
             <div style={{ fontWeight: 600 }}>Total</div>
@@ -843,12 +1134,12 @@ function OrderCard({ initialOrder, role, canArchive, onRefresh, onArchive }) {
         )}
       </div>
 
-      <ModalWrapper order={order} />
+      <ModalWrapper order={order} userRole={role} />
     </Card>
   );
 }
 
-function ModalWrapper({ order }) {
+function ModalWrapper({ order, userRole }) {
   const [open, setOpen] = useState(false);
   useEffect(() => {
     const handler = (e) => {
@@ -865,7 +1156,7 @@ function ModalWrapper({ order }) {
       onClose={() => setOpen(false)}
       title={`Order #${displayOrderId}`}
     >
-      <OrderDetails order={order} />
+      <OrderDetails order={order} userRole={userRole} />
     </Modal>
   );
 }

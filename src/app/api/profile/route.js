@@ -14,7 +14,7 @@ function jsonError(message, status = 500, extra = {}) {
   return Response.json({ message, ...extra }, { status });
 }
 
-// GET /api/profile  -> current user's profile (without password)
+// GET /api/profile -> current user's profile (without password)
 export async function GET() {
   try {
     const session = await getServerSession(authOptions);
@@ -34,8 +34,8 @@ export async function GET() {
   }
 }
 
-// PATCH /api/profile  -> update current user's profile fields
-// Body: { firstName, lastName, address, phone }
+// PATCH /api/profile -> update current user's profile fields
+// Body: { firstName, lastName, street, barangay, city, province, phone }
 export async function PATCH(req) {
   try {
     const session = await getServerSession(authOptions);
@@ -44,8 +44,17 @@ export async function PATCH(req) {
     await dbConnect();
 
     const body = await req.json();
-    const allowed = ['firstName', 'lastName', 'address', 'phone'];
+    const allowed = [
+      'firstName',
+      'lastName',
+      'street',
+      'barangay',
+      'city',
+      'province',
+      'phone',
+    ];
     const $set = {};
+
     for (const key of allowed) {
       if (Object.prototype.hasOwnProperty.call(body, key)) {
         const v = body[key];
@@ -54,9 +63,25 @@ export async function PATCH(req) {
     }
 
     // Basic validation
-    if (!$set.firstName || !$set.lastName || !$set.address || !$set.phone) {
+    if (
+      !$set.firstName ||
+      !$set.lastName ||
+      !$set.street ||
+      !$set.barangay ||
+      !$set.phone
+    ) {
       return jsonError('All fields are required.', 400);
     }
+
+    // Construct full address from components
+    const street = $set.street || '';
+    const barangay = $set.barangay || '';
+    const city = $set.city || 'San Mateo';
+    const province = $set.province || 'Rizal';
+
+    $set.address = `${street}, ${barangay}, ${city}, ${province}`;
+    $set.city = city;
+    $set.province = province;
 
     const updated = await User.findByIdAndUpdate(
       session.user.id,
@@ -67,9 +92,11 @@ export async function PATCH(req) {
       .lean();
 
     if (!updated) return jsonError('User not found', 404);
-    return Response.json({ user: updated, message: 'Profile updated' }, { status: 200 });
+    return Response.json(
+      { user: updated, message: 'Profile updated' },
+      { status: 200 }
+    );
   } catch (err) {
-    // Mongoose validation messages
     if (err?.name === 'ValidationError') {
       const msg = Object.values(err.errors || {})
         .map((e) => e.message)

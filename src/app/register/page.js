@@ -5,6 +5,25 @@ import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 import Link from 'next/link';
 
+// Barangays of San Mateo, Rizal
+const BARANGAYS = [
+  'Ampid 1',
+  'Ampid 2',
+  'Banaba',
+  'Dulong Bayan 1',
+  'Dulong Bayan 2',
+  'Guinayang',
+  'Guitnang Bayan 1',
+  'Guitnang Bayan 2',
+  'Gulod Malaya',
+  'Malanday',
+  'Maly',
+  'Pintong Bukawe',
+  'Santa Ana',
+  'Santo Niño',
+  'Silangan',
+];
+
 export default function RegisterPage() {
   const router = useRouter();
   const [step, setStep] = useState(1); // 1: registration form, 2: OTP verification
@@ -13,10 +32,12 @@ export default function RegisterPage() {
     password: '',
     firstName: '',
     lastName: '',
-    address: '',
+    street: '',
+    barangay: BARANGAYS[0],
+    city: 'San Mateo',
+    province: 'Rizal',
     phone: '',
-    accountType: 'customer',  // NEW: 'customer' | 'rider'
-    riderImageData: '',       // NEW: base64/dataURL
+    accountType: 'customer', // Fixed to customer
   });
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
@@ -24,45 +45,12 @@ export default function RegisterPage() {
   // show/hide password
   const [showPassword, setShowPassword] = useState(false);
 
-  // local preview of rider image
-  const [riderImagePreview, setRiderImagePreview] = useState(null);
-
   function update(key, value) {
     setForm((s) => ({ ...s, [key]: value }));
   }
 
-  function handleAccountTypeChange(type) {
-    if (type !== 'customer' && type !== 'rider') return;
-    setForm((s) => ({
-      ...s,
-      accountType: type,
-    }));
-  }
-
-  function handleRiderImageChange(e) {
-    const file = e.target.files?.[0];
-    if (!file) {
-      setRiderImagePreview(null);
-      update('riderImageData', '');
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      const result = reader.result || '';
-      setRiderImagePreview(result);
-      update('riderImageData', result); // store data URL/base64 string
-    };
-    reader.readAsDataURL(file);
-  }
-
   async function onSubmitRegistration(e) {
     e.preventDefault();
-
-    if (form.accountType === 'rider' && !form.riderImageData) {
-      toast.error('Please upload an image to register as a rider.');
-      return;
-    }
 
     setLoading(true);
     try {
@@ -139,46 +127,6 @@ export default function RegisterPage() {
                 onSubmit={onSubmitRegistration}
                 className="mt-6 grid grid-cols-1 gap-3"
               >
-                {/* Account type toggle */}
-                <div>
-                  <p className="mb-1 text-xs font-semibold text-zinc-700">
-                    Register as
-                  </p>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => handleAccountTypeChange('customer')}
-                      className={[
-                        'cursor-pointer rounded-xl border px-4 py-2 text-sm font-semibold transition',
-                        form.accountType === 'customer'
-                          ? 'border-[#A5724A] bg-[#F3EDE2] text-[#7A4E2A] shadow-sm'
-                          : 'border-zinc-300 bg-white hover:bg-zinc-50 text-zinc-700',
-                      ].join(' ')}
-                    >
-                      Customer
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleAccountTypeChange('rider')}
-                      className={[
-                        'cursor-pointer rounded-xl border px-4 py-2 text-sm font-semibold transition',
-                        form.accountType === 'rider'
-                          ? 'border-emerald-500 bg-emerald-50 text-emerald-700 shadow-sm'
-                          : 'border-zinc-300 bg-white hover:bg-zinc-50 text-zinc-700',
-                      ].join(' ')}
-                    >
-                      Rider
-                    </button>
-                  </div>
-                  {form.accountType === 'rider' && (
-                    <p className="mt-1 text-[11px] text-zinc-500">
-                      We’ll review your rider application before you can take
-                      delivery orders. Please upload a clear photo of your ID or
-                      rider proof.
-                    </p>
-                  )}
-                </div>
-
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <input
                     className={inputCls}
@@ -198,14 +146,65 @@ export default function RegisterPage() {
                   />
                 </div>
 
-                <input
-                  className={inputCls}
-                  type="text"
-                  placeholder="Address"
-                  value={form.address}
-                  onChange={(e) => update('address', e.target.value)}
-                  required
-                />
+                {/* Address fields */}
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-zinc-700">
+                    Street Address <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    className={inputCls}
+                    type="text"
+                    placeholder="e.g., 123 Main Street, Block 5 Lot 10"
+                    value={form.street}
+                    onChange={(e) => update('street', e.target.value)}
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-zinc-700">
+                    Barangay <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    className={inputCls}
+                    value={form.barangay}
+                    onChange={(e) => update('barangay', e.target.value)}
+                    required
+                  >
+                    {BARANGAYS.map((brgy) => (
+                      <option key={brgy} value={brgy}>
+                        {brgy}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-zinc-700">
+                      City
+                    </label>
+                    <input
+                      className={inputCls + ' bg-zinc-100 cursor-not-allowed'}
+                      type="text"
+                      value={form.city}
+                      disabled
+                      readOnly
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-1 block text-xs font-semibold text-zinc-700">
+                      Province
+                    </label>
+                    <input
+                      className={inputCls + ' bg-zinc-100 cursor-not-allowed'}
+                      type="text"
+                      value={form.province}
+                      disabled
+                      readOnly
+                    />
+                  </div>
+                </div>
 
                 <input
                   className={inputCls}
@@ -224,34 +223,6 @@ export default function RegisterPage() {
                   onChange={(e) => update('email', e.target.value)}
                   required
                 />
-
-                {/* Rider image upload (only when accountType === 'rider') */}
-                {form.accountType === 'rider' && (
-                  <div>
-                    <label className="mb-1 block text-xs font-semibold text-zinc-700">
-                      Rider proof image <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      className={inputCls}
-                      type="file"
-                      accept="image/*"
-                      onChange={handleRiderImageChange}
-                      required={form.accountType === 'rider'}
-                    />
-                    {riderImagePreview && (
-                      <div className="mt-2">
-                        <p className="mb-1 text-[11px] text-zinc-500">
-                          Preview:
-                        </p>
-                        <img
-                          src={riderImagePreview}
-                          alt="Rider proof preview"
-                          className="max-h-40 rounded-lg border border-zinc-200 object-contain"
-                        />
-                      </div>
-                    )}
-                  </div>
-                )}
 
                 {/* Password with show/hide toggle */}
                 <div className="relative">

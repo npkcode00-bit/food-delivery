@@ -104,29 +104,40 @@ export default function Header() {
   const canSeeInventory = isAdmin || isCashier;
   const canSeeAccounting = isAdmin || isAccounting;
 
-  // FULL NAV ITEMS ARRAY WITH RIDER
-  const navItems = [
-    { label: 'Accounting', href: '/accounting', show: canSeeAccounting },
-    { label: 'Home', href: '/', show: showHome },
-    { label: 'Inventory', href: '/inventory', show: canSeeInventory },
-    { label: 'Items', href: '/admin', show: isAdmin },
-    {
-      label: 'Menu',
-      href: '/menu',
-      show: !isAccounting && !isCashier,
-    },
-    { label: 'Orders', href: '/orders', show: isAuthed },
-    { label: 'Users', href: '/users', show: isAdmin },
+  let navItems;
 
-    // ⭐ NEW: Rider page
-    {
-      label: 'Rider',
-      href: '/rider',
-      show: isAdmin || isRider,
-    },
-  ]
-    .filter((i) => i.show)
-    .sort((a, b) => a.label.localeCompare(b.label));
+  // ⭐ If rider (and not admin), ONLY show the Rider tab
+  if (isRider && !isAdmin) {
+    navItems = [
+      {
+        label: 'Rider',
+        href: '/rider',
+        show: true,
+      },
+    ];
+  } else {
+    // Normal nav for everyone else
+    navItems = [
+      { label: 'Accounting', href: '/accounting', show: canSeeAccounting },
+      { label: 'Home', href: '/', show: showHome },
+      { label: 'Inventory', href: '/inventory', show: canSeeInventory },
+      { label: 'Items', href: '/admin', show: isAdmin },
+      {
+        label: 'Menu',
+        href: '/menu',
+        show: !isAccounting && !isCashier,
+      },
+      { label: 'Orders', href: '/orders', show: isAuthed },
+      { label: 'Users', href: '/users', show: isAdmin },
+      {
+        label: 'Rider',
+        href: '/rider',
+        show: isAdmin || isRider,
+      },
+    ]
+      .filter((i) => i.show)
+      .sort((a, b) => a.label.localeCompare(b.label));
+  }
 
   const isActive = (href) => {
     if (href === '/') return pathname === '/';
